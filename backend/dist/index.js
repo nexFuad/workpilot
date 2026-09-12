@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -16,7 +17,7 @@ app.get('/', (c) => c.json({ name: 'WorkPilot API', status: 'ok' }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 serve({
     fetch: app.fetch,
-    port: Number(process.env.PORT) || 3000,
+    port: Number(process.env.PORT) || 4000,
 }, (info) => {
     console.log(`Server is running on http://localhost:${info.port}`);
 });

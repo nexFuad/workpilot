@@ -1,9 +1,25 @@
-import Link from 'next/link'
+import { Footer } from '@/components/Footer';
+import { Navbar } from '@/components/Navbar';
+import { CtaSection } from '@/components/Landing/CtaSection';
+import { FaqSection } from '@/components/Landing/FaqSection';
+import { FeaturesSection } from '@/components/Landing/FeaturesSection';
+import { HeroSection } from '@/components/Landing/HeroSection';
+import { InsightsSection } from '@/components/Landing/InsightsSection';
+import { RolesSection } from '@/components/Landing/RolesSection';
+import { WorkflowSection } from '@/components/Landing/WorkflowSection';
 
 export default function Home() {
-  return <main className="min-h-screen bg-slate-50 text-slate-900">
-    <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5"><span className="text-xl font-bold text-indigo-700">WorkPilot</span><Link href="/login" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Sign in</Link></nav>
-    <section className="mx-auto grid max-w-6xl gap-12 px-6 py-20 md:grid-cols-2 md:items-center"><div><p className="font-semibold text-indigo-600">WORKFORCE MANAGEMENT</p><h1 className="mt-4 text-5xl font-bold tracking-tight">Run your people operations with clarity.</h1><p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">One calm workspace for employees, attendance, leave, payroll, projects, and daily work.</p><div className="mt-8 flex gap-3"><Link href="/login" className="rounded-lg bg-indigo-600 px-5 py-3 font-semibold text-white">Get started</Link><a href="#roles" className="rounded-lg border border-slate-300 px-5 py-3 font-semibold">Explore roles</a></div></div><div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-8 shadow-sm"><p className="text-sm font-medium text-indigo-700">Today at WorkPilot</p><div className="mt-5 space-y-3">{['Team attendance is on track', '4 leave requests need review', 'Payroll period closes in 5 days'].map((item) => <div className="rounded-xl bg-white p-4 text-slate-700 shadow-sm" key={item}>{item}</div>)}</div></div></section>
-    <section id="roles" className="mx-auto max-w-6xl px-6 pb-20"><h2 className="text-2xl font-bold">Built for every role</h2><div className="mt-6 grid gap-4 md:grid-cols-3">{[['Admin','Manage the organization, access, and operations.','/dashboard/admin'],['HR','Support people, leave, hiring, and attendance.','/dashboard/hr'],['Employee','See your work, schedule, and requests.','/dashboard/employee']].map(([role, text, href]) => <Link href={href} className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-indigo-300 hover:shadow-sm" key={role}><h3 className="font-bold">{role}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{text}</p></Link>)}</div></section>
-  </main>
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <Navbar />
+      <HeroSection />
+      <FeaturesSection />
+      <WorkflowSection />
+      <InsightsSection />
+      <RolesSection />
+      <FaqSection />
+      <CtaSection />
+      <Footer />
+    </main>
+  );
 }
