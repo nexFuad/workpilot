@@ -1,5 +1,0 @@
-import Link from 'next/link'
-
-export default function LoginPage() {
-  return <main className="grid min-h-screen place-items-center bg-slate-50 p-6"><section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><Link href="/" className="text-lg font-bold text-indigo-700">WorkPilot</Link><h1 className="mt-8 text-2xl font-bold">Welcome back</h1><p className="mt-2 text-sm text-slate-600">Sign in to access your workspace.</p><form className="mt-7 space-y-4"><label className="block text-sm font-medium">Email<input type="email" placeholder="you@company.com" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-indigo-500" /></label><label className="block text-sm font-medium">Password<input type="password" placeholder="••••••••" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-indigo-500" /></label><button type="button" className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">Sign in</button></form><p className="mt-5 text-center text-xs text-slate-500">Authentication will be connected later.</p></section></main>
-}
