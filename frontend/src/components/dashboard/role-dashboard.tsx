@@ -1,0 +1,5 @@
+type RoleDashboardProps = { role: string; accent: 'indigo' | 'emerald' | 'sky'; description: string; stats: string[] }
+
+const accentClasses = { indigo: 'bg-indigo-600', emerald: 'bg-emerald-600', sky: 'bg-sky-600' }
+
+export function RoleDashboard({ role, accent, description, stats }: RoleDashboardProps) { return <section><div className={`${accentClasses[accent]} rounded-2xl p-7 text-white`}><p className="text-sm font-semibold uppercase tracking-wider opacity-80">{role} workspace</p><h1 className="mt-2 text-3xl font-bold">{role} Dashboard</h1><p className="mt-2 max-w-xl text-white/85">{description}</p></div><div className="mt-6 grid gap-4 md:grid-cols-3">{stats.map((stat) => <article key={stat} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Preview metric</p><p className="mt-2 text-xl font-bold text-slate-800">{stat}</p></article>)}</div><div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">{role} layout area — features will be added here later.</div></section> }
