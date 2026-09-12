@@ -1,7 +1,7 @@
 'use client';
 
 import { Menu, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Logo } from '@/components/shared/Logo';
 
 const links = [
@@ -16,6 +16,8 @@ const links = [
 export function Navbar() {
   const [activeId, setActiveId] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const sections = links
@@ -31,6 +33,17 @@ export function Navbar() {
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeOnOutsideClick(event: PointerEvent) {
+      const target = event.target as Node;
+      if (drawerRef.current?.contains(target) || menuButtonRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, [menuOpen]);
 
   function scrollToSection(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -59,12 +72,14 @@ export function Navbar() {
         </div>
         <a
           href="/login"
-          className="hidden rounded-lg bg-indigo-100 px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-200 sm:inline-flex"
+          className="hidden rounded-lg bg-indigo-100 px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-200 lg:inline-flex"
         >
           Sign in
         </a>
         <button
-          aria-label="Open navigation menu"
+          ref={menuButtonRef}
+          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
           className="rounded-lg p-2 text-slate-700 hover:bg-slate-100 lg:hidden"
         >
@@ -72,26 +87,48 @@ export function Navbar() {
         </button>
       </nav>
       {menuOpen && (
-        <div className="border-t border-slate-100 bg-white px-4 py-3 lg:hidden">
-          <div className="mx-auto grid max-w-7xl gap-1">
-            {links.map((link) => (
+        <div className="lg:hidden">
+          <button
+            aria-label="Close navigation menu"
+            onClick={() => setMenuOpen(false)}
+            className="fixed inset-0 z-40 cursor-default bg-slate-900/10 backdrop-blur-[1px]"
+          />
+          <aside
+            ref={drawerRef}
+            className="fixed left-3 top-20 z-50 h-fit w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/40"
+          >
+            <div className="mb-2 flex items-center justify-between px-2 pt-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Navigate
+              </span>
               <button
-                key={link.id}
-                onClick={() => scrollToSection(link.id)}
-                className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium ${
-                  activeId === link.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'
-                }`}
+                aria-label="Close navigation menu"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
               >
-                {link.label}
+                <X className="size-4" />
               </button>
-            ))}
-            <a
-              href="/login"
-              className="mt-2 rounded-lg bg-indigo-100 px-3 py-2.5 text-center text-sm font-semibold text-indigo-700"
-            >
-              Sign in
-            </a>
-          </div>
+            </div>
+            <div className="grid gap-1">
+              {links.map((link) => (
+                <button
+                  key={link.id}
+                  onClick={() => scrollToSection(link.id)}
+                  className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium ${
+                    activeId === link.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'
+                  }`}
+                >
+                  {link.label}
+                </button>
+              ))}
+              <a
+                href="/login"
+                className="mt-2 rounded-lg bg-indigo-100 px-3 py-2.5 text-center text-sm font-semibold text-indigo-700"
+              >
+                Sign in
+              </a>
+            </div>
+          </aside>
         </div>
       )}
     </header>

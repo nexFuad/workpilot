@@ -8,6 +8,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
     "start": "node dist/index.js",
     "format": "prettier --write . --ignore-path ../.prettierignore",
     "format:check": "prettier --check . --ignore-path ../.prettierignore"
@@ -16,8 +17,10 @@
     "@hono/node-server": "^2.1.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "hono": "^4.13.7",
+    "jose": "^6.2.12",
     "pg": "^8.23.0",
     "zod": "^4.6.2"
   },
