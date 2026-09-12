@@ -5,3 +5,32 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model User {
+  id           String           @id @default(cuid())
+  employeeId   String
+  companyName  String
+  passwordHash String
+  role         String
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  sessions     RefreshSession[]
+
+  @@unique([employeeId, companyName])
+  @@index([role])
+}
+
+model RefreshSession {
+  id        String    @id @default(cuid())
+  tokenId   String    @unique
+  userId    String
+  rememberMe Boolean  @default(false)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}

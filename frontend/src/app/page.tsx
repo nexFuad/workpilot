@@ -1,5 +1,6 @@
 import { Footer } from '@/components/Footer';
 import { Navbar } from '@/components/Navbar';
+import { AuthRedirect } from '@/components/auth/AuthRedirect';
 import { CtaSection } from '@/components/Landing/CtaSection';
 import { FaqSection } from '@/components/Landing/FaqSection';
 import { FeaturesSection } from '@/components/Landing/FeaturesSection';
@@ -11,6 +12,7 @@ import { WorkflowSection } from '@/components/Landing/WorkflowSection';
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <AuthRedirect />
       <Navbar />
       <HeroSection />
       <FeaturesSection />
