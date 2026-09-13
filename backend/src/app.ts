@@ -2,6 +2,14 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { env } from './config/env.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { attendanceRoutes } from './modules/attendance/attendance.routes.js';
+import { leaveRoutes } from './modules/leave/leave.routes.js';
+import { compensationRoutes } from './modules/compensation/compensation.routes.js';
+import { taskRoutes } from './modules/tasks/tasks.routes.js';
+import { projectRoutes } from './modules/projects/projects.routes.js';
+import { documentRoutes } from './modules/documents/documents.routes.js';
+import { announcementRoutes } from './modules/announcements/announcements.routes.js';
+import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 
 export const app = new Hono();
 app.use(
@@ -16,3 +24,11 @@ app.use(
 app.get('/', (c) => c.json({ name: 'WorkPilot API', status: 'ok' }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
+app.route('/api/attendance', attendanceRoutes);
+app.route('/api/leaves', leaveRoutes);
+app.route('/api/compensation', compensationRoutes);
+app.route('/api/tasks', taskRoutes);
+app.route('/api/projects', projectRoutes);
+app.route('/api/documents', documentRoutes);
+app.route('/api/announcements', announcementRoutes);
+app.route('/api/dashboard', dashboardRoutes);

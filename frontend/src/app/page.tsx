@@ -1,6 +1,9 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Footer } from '@/components/Footer';
 import { Navbar } from '@/components/Navbar';
-import { AuthRedirect } from '@/components/auth/AuthRedirect';
 import { CtaSection } from '@/components/Landing/CtaSection';
 import { FaqSection } from '@/components/Landing/FaqSection';
 import { FeaturesSection } from '@/components/Landing/FeaturesSection';
@@ -8,11 +11,17 @@ import { HeroSection } from '@/components/Landing/HeroSection';
 import { InsightsSection } from '@/components/Landing/InsightsSection';
 import { RolesSection } from '@/components/Landing/RolesSection';
 import { WorkflowSection } from '@/components/Landing/WorkflowSection';
+import { useAuth } from '@/hooks/use-auth';
+import { roleDashboardPath } from '@/lib/roles';
 
 export default function Home() {
+  const router = useRouter();
+  const { user } = useAuth();
+  useEffect(() => {
+    if (user) router.replace(roleDashboardPath[user.role]);
+  }, [router, user]);
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AuthRedirect />
       <Navbar />
       <HeroSection />
       <FeaturesSection />

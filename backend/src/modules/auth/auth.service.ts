@@ -3,19 +3,27 @@ import { randomUUID } from 'node:crypto';
 import { type AuthRole, type TokenPayload, signToken, verifyToken } from '../../lib/jwt.js';
 import { prisma } from '../../lib/prisma.js';
 
-export type PublicUser = { id: string; employeeId: string; companyName: string; role: AuthRole };
+export type PublicUser = { id: string; employeeId: string; companyName: string; role: AuthRole; fullName: string | null; phone: string | null; address: string | null; profileImage: string | null };
 
 function toPublicUser(user: {
   id: string;
   employeeId: string;
   companyName: string;
   role: string;
+  fullName: string | null;
+  phone: string | null;
+  address: string | null;
+  profileImage: string | null;
 }): PublicUser {
   return {
     id: user.id,
     employeeId: user.employeeId,
     companyName: user.companyName,
     role: user.role as AuthRole,
+    fullName: user.fullName,
+    phone: user.phone,
+    address: user.address,
+    profileImage: user.profileImage,
   };
 }
 

@@ -1,0 +1,11 @@
+import { getCookie } from 'hono/cookie';
+import { Hono, type Context } from 'hono';
+import { prisma } from '../../lib/prisma.js';
+import { getCurrentUser } from '../auth/auth.service.js';
+import { documentReviewSchema, documentSchema } from './documents.schema.js';
+async function currentUser(c: Context) { try { return await getCurrentUser(getCookie(c, 'workpilot_access') ?? ''); } catch { return null; } }
+export const documentRoutes = new Hono()
+  .get('/', async (c) => { const user = await currentUser(c); if (!user) return c.json({ message: 'Unauthorized.' }, 401); const documents = await prisma.employeeDocument.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }); return c.json({ documents }); })
+  .post('/', async (c) => { const user = await currentUser(c); if (!user) return c.json({ message: 'Unauthorized.' }, 401); const parsed = documentSchema.safeParse(await c.req.json().catch(() => null)); if (!parsed.success) return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid document.' }, 400); const document = await prisma.employeeDocument.create({ data: { ...parsed.data, userId: user.id } }); return c.json({ document }, 201); })
+  .get('/review', async (c) => { const reviewer = await currentUser(c); if (!reviewer) return c.json({ message: 'Unauthorized.' }, 401); if (!['admin', 'hr'].includes(reviewer.role)) return c.json({ message: 'Only HR or admin can review documents.' }, 403); const documents = await prisma.employeeDocument.findMany({ orderBy: { createdAt: 'desc' }, include: { user: { select: { employeeId: true, companyName: true } } } }); return c.json({ documents }); })
+  .patch('/:id/review', async (c) => { const reviewer = await currentUser(c); if (!reviewer) return c.json({ message: 'Unauthorized.' }, 401); if (!['admin', 'hr'].includes(reviewer.role)) return c.json({ message: 'Only HR or admin can review documents.' }, 403); const parsed = documentReviewSchema.safeParse(await c.req.json().catch(() => null)); if (!parsed.success) return c.json({ message: 'Invalid review.' }, 400); const document = await prisma.employeeDocument.update({ where: { id: c.req.param('id') }, data: { ...parsed.data, reviewedAt: new Date() } }).catch(() => null); if (!document) return c.json({ message: 'Document not found.' }, 404); return c.json({ document }); });
