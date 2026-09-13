@@ -10,15 +10,232 @@ model User {
   id           String           @id @default(cuid())
   employeeId   String
   companyName  String
+  fullName     String?
+  phone        String?
+  address      String?
+  profileImage String?
   passwordHash String
   role         String
   isActive     Boolean          @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   sessions     RefreshSession[]
+  attendances  Attendance[]
+  leaveRequests LeaveRequest[]
+  salaryPayments SalaryPayment[]
+  salaryAdvances SalaryAdvanceRequest[]
+  loanRequests   LoanRequest[]
+  loans          Loan[]
+  tasks          Task[]
+  projectAssignments ProjectAssignment[]
+  documents      EmployeeDocument[]
 
   @@unique([employeeId, companyName])
   @@index([role])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  priority  String   @default("normal")
+  isPinned  Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPinned, publishedAt])
+}
+
+model EmployeeDocument {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  fileUrl     String
+  fileType    String
+  size        Int
+  status      String   @default("pending")
+  reviewerNote String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("active")
+  progress    Int      @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  assignments ProjectAssignment[]
+
+  @@index([status])
+}
+
+model ProjectAssignment {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("Contributor")
+  joinedAt  DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  priority    String   @default("medium")
+  status      String   @default("todo")
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([dueDate])
+}
+
+model SalaryPayment {
+  id            String   @id @default(cuid())
+  userId        String
+  month         String
+  period        String
+  paidOn        DateTime?
+  basic         Int
+  allowances    Int      @default(0)
+  bonus         Int      @default(0)
+  tax           Int      @default(0)
+  providentFund Int      @default(0)
+  status        String   @default("upcoming")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@index([userId, status])
+}
+
+model SalaryAdvanceRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Int
+  reason          String
+  settlementMonth String
+  status          String   @default("pending")
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model LoanRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  purpose   String
+  tenure    Int
+  status    String   @default("pending")
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loan      Loan?
+
+  @@index([userId, status])
+}
+
+model Loan {
+  id            String   @id @default(cuid())
+  userId        String
+  requestId     String   @unique
+  principal     Int
+  outstanding   Int
+  installment   Int
+  tenure        Int
+  paidInstallments Int @default(0)
+  nextDue       DateTime
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request       LoanRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Site {
+  id                  String       @id @default(cuid())
+  name                String       @unique
+  location            String
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  checkInAttendances  Attendance[] @relation("CheckInSite")
+  checkOutAttendances Attendance[] @relation("CheckOutSite")
+}
+
+model Shift {
+  id                  String       @id @default(cuid())
+  name                String       @unique
+  startTime           String
+  endTime             String
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  checkInAttendances  Attendance[] @relation("CheckInShift")
+  checkOutAttendances Attendance[] @relation("CheckOutShift")
+}
+
+model Attendance {
+  id              String    @id @default(cuid())
+  userId          String
+  checkInSiteId   String
+  checkInShiftId  String
+  checkInAt       DateTime  @default(now())
+  checkInPhotoUrl String
+  checkOutSiteId  String?
+  checkOutShiftId String?
+  checkOutAt      DateTime?
+  checkOutPhotoUrl String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkInSite     Site      @relation("CheckInSite", fields: [checkInSiteId], references: [id])
+  checkOutSite    Site?     @relation("CheckOutSite", fields: [checkOutSiteId], references: [id])
+  checkInShift    Shift     @relation("CheckInShift", fields: [checkInShiftId], references: [id])
+  checkOutShift   Shift?    @relation("CheckOutShift", fields: [checkOutShiftId], references: [id])
+
+  @@index([userId, checkOutAt])
+  @@index([checkInAt])
+}
+
+model LeaveRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  leaveType String
+  reason    String
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([startDate])
 }
 
 model RefreshSession {

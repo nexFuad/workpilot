@@ -21,11 +21,18 @@ export function useAuth() {
     mutationFn: authServer.logout,
     onSuccess: () => queryClient.removeQueries({ queryKey: authKey }),
   });
+  const updateProfile = useMutation({
+    mutationFn: authServer.updateProfile,
+    onSuccess: (data) => queryClient.setQueryData(authKey, data),
+  });
+  const updatePassword = useMutation({ mutationFn: authServer.updatePassword });
   return {
     user: query.data?.user,
     isLoading: query.isLoading,
     isAuthenticated: Boolean(query.data?.user),
     login,
     logout,
+    updateProfile,
+    updatePassword,
   };
 }

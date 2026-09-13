@@ -1,7 +1,9 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { Hono } from 'hono';
 import { env } from '../../config/env.js';
-import { loginSchema } from './auth.schema.js';
+import { loginSchema, passwordSchema, profileSchema } from './auth.schema.js';
+import { compare, hash } from 'bcryptjs';
+import { prisma } from '../../lib/prisma.js';
 import { authenticateUser, createLoginSession, getCurrentUser, revokeRefreshToken, rotateRefreshToken, } from './auth.service.js';
 const ACCESS_COOKIE = 'workpilot_access';
 const REFRESH_COOKIE = 'workpilot_refresh';
@@ -68,6 +70,35 @@ export const authRoutes = new Hono()
     .get('/me', async (c) => {
     try {
         return c.json({ user: await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '') });
+    }
+    catch {
+        return c.json({ message: 'Unauthorized.' }, 401);
+    }
+})
+    .patch('/profile', async (c) => {
+    try {
+        const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '');
+        const parsed = profileSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success)
+            return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid profile.' }, 400);
+        const updated = await prisma.user.update({ where: { id: user.id }, data: { ...parsed.data, profileImage: parsed.data.profileImage || null } });
+        return c.json({ user: { id: updated.id, employeeId: updated.employeeId, companyName: updated.companyName, role: updated.role, fullName: updated.fullName, phone: updated.phone, address: updated.address, profileImage: updated.profileImage } });
+    }
+    catch {
+        return c.json({ message: 'Unauthorized.' }, 401);
+    }
+})
+    .patch('/password', async (c) => {
+    try {
+        const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '');
+        const parsed = passwordSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success)
+            return c.json({ message: 'New password must have at least 8 characters.' }, 400);
+        const account = await prisma.user.findUnique({ where: { id: user.id } });
+        if (!account || !(await compare(parsed.data.currentPassword, account.passwordHash)))
+            return c.json({ message: 'Current password is incorrect.' }, 400);
+        await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(parsed.data.newPassword, 12) } });
+        return c.json({ message: 'Password updated.' });
     }
     catch {
         return c.json({ message: 'Unauthorized.' }, 401);

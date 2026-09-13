@@ -8,6 +8,10 @@ function toPublicUser(user) {
         employeeId: user.employeeId,
         companyName: user.companyName,
         role: user.role,
+        fullName: user.fullName,
+        phone: user.phone,
+        address: user.address,
+        profileImage: user.profileImage,
     };
 }
 export async function authenticateUser(employeeId, companyName, password) {
