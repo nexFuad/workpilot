@@ -10,6 +10,14 @@ import { projectRoutes } from './modules/projects/projects.routes.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
 import { announcementRoutes } from './modules/announcements/announcements.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
+import { hrAttendanceRoutes } from './modules/hr/hr-attendance.routes.js';
+import { hrSettingsRoutes } from './modules/hr/hr-settings.routes.js';
+import { hrLeaveRoutes } from './modules/hr/hr-leave.routes.js';
+import { hrPayrollRoutes } from './modules/hr/hr-payroll.routes.js';
+import { hrAdvancesRoutes } from './modules/hr/hr-advances.routes.js';
+import { hrLoansRoutes } from './modules/hr/hr-loans.routes.js';
+import { hrAnnouncementsRoutes } from './modules/hr/hr-announcements.routes.js';
+import { hrTasksRoutes } from './modules/hr/hr-tasks.routes.js';
 export const app = new Hono();
 app.use('*', cors({
     origin: [env.FRONTEND_URL, 'http://localhost:3000'],
@@ -28,3 +36,11 @@ app.route('/api/projects', projectRoutes);
 app.route('/api/documents', documentRoutes);
 app.route('/api/announcements', announcementRoutes);
 app.route('/api/dashboard', dashboardRoutes);
+app.route('/api/hr/attendance', hrAttendanceRoutes);
+app.route('/api/hr', hrSettingsRoutes);
+app.route('/api/hr/leaves', hrLeaveRoutes);
+app.route('/api/hr/payroll', hrPayrollRoutes);
+app.route('/api/hr/advances', hrAdvancesRoutes);
+app.route('/api/hr/loans', hrLoansRoutes);
+app.route('/api/hr/announcements', hrAnnouncementsRoutes);
+app.route('/api/hr/tasks', hrTasksRoutes);
