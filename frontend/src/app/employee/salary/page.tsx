@@ -30,7 +30,7 @@ type SalaryRecord = {
   status: string;
 };
 type AdvanceRequest = {
-  id: number;
+  id: string;
   amount: number;
   reason: string;
   requestedOn: string;
@@ -93,7 +93,7 @@ const takeHome = (record: SalaryRecord) =>
 
 const initialAdvances: AdvanceRequest[] = [
   {
-    id: 1,
+    id: '1',
     amount: 5000,
     reason: 'Urgent medical expense',
     requestedOn: '08 September 2026',
@@ -182,7 +182,7 @@ export default function SalaryPage() {
       });
       setAdvances((current) => [
         {
-          id: Date.now(),
+          id: Date.now().toString(),
           amount,
           reason: advanceReason.trim(),
           requestedOn: 'Today',

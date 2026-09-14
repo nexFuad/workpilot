@@ -1,76 +1,73 @@
 'use client';
-import { CalendarDays, Check, X } from 'lucide-react';
+import { Check, HandCoins, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
-import { useHrLeave } from '@/hooks/use-hr-leave';
-const format = (value: string) =>
-  new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(value));
+import { useHrAdvances } from '@/hooks/use-hr-advances';
+const money = new Intl.NumberFormat('en-BD', {
+  style: 'currency',
+  currency: 'BDT',
+  maximumFractionDigits: 0,
+});
 const badge: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700',
   approved: 'bg-emerald-100 text-emerald-700',
   rejected: 'bg-rose-100 text-rose-700',
 };
-export default function LeavePage() {
+export default function AdvancesPage() {
+  const api = useHrAdvances();
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const api = useHrLeave();
   const items =
-    api.requests.data?.requests.filter((item) => filter === 'all' || item.status === filter) ?? [];
+    api.requests.data?.requests.filter((x) => filter === 'all' || x.status === filter) ?? [];
   const visible = items.slice((page - 1) * 10, page * 10);
   const review = async (id: string, status: 'approved' | 'rejected') => {
     try {
       await api.review.mutateAsync({ id, status });
-      toast.success(`Leave request ${status}.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to update request.');
+      toast.success(`Salary advance ${status}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed.');
     }
   };
   return (
     <section className="w-full space-y-6">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
+        <p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-600">
           HR workspace
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-800">Leave requests</h1>
+        <h1 className="mt-2 text-3xl font-bold text-slate-800">Salary advances</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Review employee leave requests and update their approval status.
+          Review employee requests and approve or reject advance payments.
         </p>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <CalendarDays className="size-5 text-emerald-600" />
+      <div className="flex flex-wrap justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <HandCoins className="size-5 text-emerald-600" />
           {items.length} request(s)
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {['all', 'pending', 'approved', 'rejected'].map((item) => (
+        </span>
+        <div className="flex gap-2">
+          {['all', 'pending', 'approved', 'rejected'].map((x) => (
             <button
-              key={item}
+              key={x}
               onClick={() => {
-                setFilter(item);
+                setFilter(x);
                 setPage(1);
               }}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter === item ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter === x ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}
             >
-              {item}
+              {x}
             </button>
           ))}
         </div>
       </div>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 p-5">
-          <h2 className="font-bold text-slate-800">Leave request register</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Approve or reject pending employee leave requests.
-          </p>
-        </div>
         <div className="h-[70vh] overflow-auto">
-          <table className="w-full min-w-[1050px] text-left text-sm">
+          <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3">Employee</th>
-                <th className="px-5 py-3">Leave type</th>
-                <th className="px-5 py-3">Dates</th>
+                <th className="px-5 py-3">Amount</th>
+                <th className="px-5 py-3">Settlement month</th>
                 <th className="px-5 py-3">Reason</th>
                 <th className="px-5 py-3">Requested</th>
                 <th className="px-5 py-3">Status</th>
@@ -79,51 +76,53 @@ export default function LeavePage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {api.requests.isLoading
-                ? Array.from({ length: 10 }, (_, row) => (
-                    <tr key={row} className="animate-pulse">
-                      {Array.from({ length: 7 }, (_, cell) => (
-                        <td key={cell} className="px-5 py-5">
+                ? Array.from({ length: 10 }, (_, r) => (
+                    <tr key={r} className="animate-pulse">
+                      {Array.from({ length: 7 }, (_, c) => (
+                        <td key={c} className="px-5 py-5">
                           <span className="block h-4 w-24 rounded bg-slate-100" />
                         </td>
                       ))}
                     </tr>
                   ))
-                : visible.map((item) => (
-                    <tr key={item.id}>
+                : visible.map((x) => (
+                    <tr key={x.id}>
                       <td className="px-5 py-4">
                         <p className="font-semibold text-slate-800">
-                          {item.user.fullName || item.user.employeeId}
+                          {x.user.fullName || x.user.employeeId}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">{item.user.employeeId}</p>
+                        <p className="text-xs text-slate-500">{x.user.employeeId}</p>
                       </td>
-                      <td className="px-5 py-4 font-medium text-slate-700">{item.leaveType}</td>
+                      <td className="px-5 py-4 font-bold text-slate-800">
+                        {money.format(x.amount)}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">{x.settlementMonth}</td>
+                      <td className="max-w-xs px-5 py-4 text-slate-600">{x.reason}</td>
                       <td className="px-5 py-4 text-slate-600">
-                        {format(item.startDate)}
-                        <br />
-                        <span className="text-xs">to {format(item.endDate)}</span>
+                        {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(
+                          new Date(x.createdAt),
+                        )}
                       </td>
-                      <td className="max-w-xs px-5 py-4 text-slate-600">{item.reason}</td>
-                      <td className="px-5 py-4 text-slate-600">{format(item.createdAt)}</td>
                       <td className="px-5 py-4">
                         <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge[item.status]}`}
+                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge[x.status]}`}
                         >
-                          {item.status}
+                          {x.status}
                         </span>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
-                          {item.status === 'pending' ? (
+                          {x.status === 'pending' ? (
                             <>
                               <button
-                                onClick={() => review(item.id, 'approved')}
+                                onClick={() => review(x.id, 'approved')}
                                 className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
                               >
                                 <Check className="size-3.5" />
                                 Accept
                               </button>
                               <button
-                                onClick={() => review(item.id, 'rejected')}
+                                onClick={() => review(x.id, 'rejected')}
                                 className="flex items-center gap-1 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
                               >
                                 <X className="size-3.5" />

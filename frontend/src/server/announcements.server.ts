@@ -1,5 +1,7 @@
 import { apiRequest } from './auth.server';
-import type { Announcement } from '@/types/announcement.types';
+import type { AnnouncementResponse } from '@/types/announcement.types';
 export const announcementsServer = {
-  list: () => apiRequest<{ announcements: Announcement[] }>('/api/announcements'),
+  list: () => apiRequest<AnnouncementResponse>('/api/announcements'),
+  markRead: (id: string) =>
+    apiRequest<{ readAt: string }>(`/api/announcements/${id}/read`, { method: 'POST' }),
 };
