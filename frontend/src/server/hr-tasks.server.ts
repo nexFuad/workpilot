@@ -1,8 +1,11 @@
 import { apiRequest } from '@/server/auth.server';
 import type { HrTask, HrTaskInput, HrTasksResponse } from '@/types/hr-task.types';
+import { listQuery } from '@/lib/list-query';
+import type { ListParams } from '@/types/pagination.types';
 
 export const hrTasksServer = {
-  list: () => apiRequest<HrTasksResponse>('/api/hr/tasks'),
+  list: (params: ListParams = {}) =>
+    apiRequest<HrTasksResponse>(`/api/hr/tasks${listQuery(params)}`),
   create: (input: HrTaskInput) =>
     apiRequest<{ task: HrTask }>('/api/hr/tasks', {
       method: 'POST',

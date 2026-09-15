@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileText,
+  FolderKanban,
   HandCoins,
   LayoutDashboard,
   LogOut,
@@ -27,6 +28,7 @@ const links = [
   { label: 'Dashboard', href: '/hr', icon: LayoutDashboard },
   { label: 'Employees', href: '/hr/employees', icon: UsersRound },
   { label: 'Assign tasks', href: '/hr/tasks', icon: ClipboardCheck },
+  { label: 'Assign projects', href: '/hr/projects', icon: FolderKanban },
   { label: 'Attendance', href: '/hr/attendance', icon: CalendarDays },
   { label: 'Leave requests', href: '/hr/leave', icon: CalendarDays },
   { label: 'Payroll & salary', href: '/hr/payroll', icon: WalletCards },
@@ -43,7 +45,11 @@ export default function HrLayout({ children }: { children: ReactNode }) {
   const { user, isLoading, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const currentPage =
-    links.find((link) => pathname === link.href)?.label ??
+    (pathname === '/hr/employees/create'
+      ? 'Create employee'
+      : pathname.startsWith('/hr/employees/')
+        ? 'Edit employee'
+        : links.find((link) => pathname === link.href)?.label) ??
     (pathname === '/hr/account' ? 'My account' : 'HR workspace');
   useEffect(() => {
     if (!isLoading && !user) router.replace('/login');
@@ -60,8 +66,24 @@ export default function HrLayout({ children }: { children: ReactNode }) {
   }
   if (isLoading || !user || user.role !== 'hr')
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">
-        Loading your workspace…
+      <main className="flex min-h-screen animate-pulse bg-slate-50" aria-label="Loading workspace">
+        <aside className="hidden w-72 border-r border-slate-200 bg-white p-6 lg:block">
+          <span className="block h-10 w-36 rounded-xl bg-slate-100" />
+          <div className="mt-12 space-y-3">
+            {Array.from({ length: 9 }, (_, index) => (
+              <span key={index} className="block h-11 rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        </aside>
+        <section className="flex-1 p-6 lg:p-8">
+          <span className="block h-8 w-56 rounded bg-slate-200" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <span key={index} className="h-32 rounded-2xl bg-white shadow-sm" />
+            ))}
+          </div>
+          <div className="mt-6 h-96 rounded-2xl bg-white shadow-sm" />
+        </section>
       </main>
     );
   return (
@@ -89,14 +111,14 @@ export default function HrLayout({ children }: { children: ReactNode }) {
         >
           <X className="size-5" />
         </button>
-        <nav className="mt-8 flex-1 space-y-1 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="mt-8 flex-1 space-y-1 overflow-y-auto pr-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
           {links.map(({ label, href, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               title={label}
               onClick={() => setMenuOpen(false)}
-              className={`flex items-center gap-3 rounded-xl p-3 text-sm font-medium ${pathname === href ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`flex items-center gap-3 rounded-xl p-3 text-sm font-medium ${pathname === href || (href !== '/hr' && pathname.startsWith(`${href}/`)) ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               <Icon className="size-4 shrink-0" />
               <span>{label}</span>

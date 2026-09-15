@@ -6,8 +6,11 @@ import type {
 } from '@/types/hr-announcement.types';
 
 export const hrAnnouncementsServer = {
-  list: (page: number, limit = 6) =>
-    apiRequest<HrAnnouncementPage>(`/api/hr/announcements?page=${page}&limit=${limit}`),
+  list: (page: number, limit = 6, search = '') => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set('search', search);
+    return apiRequest<HrAnnouncementPage>(`/api/hr/announcements?${params.toString()}`);
+  },
   create: (input: HrAnnouncementInput) =>
     apiRequest<{ announcement: HrAnnouncement }>('/api/hr/announcements', {
       method: 'POST',

@@ -1,5 +1,6 @@
 import { getCookie } from 'hono/cookie';
 import { Hono, type Context } from 'hono';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { getCurrentUser } from '../auth/auth.service.js';
 import { attendanceActionSchema } from './attendance.schema.js';
@@ -43,44 +44,40 @@ export const attendanceRoutes = new Hono()
     const user = await currentUser(c);
     if (!user) return c.json({ message: 'Unauthorized.' }, 401);
     const search = c.req.query('search')?.trim();
+    const term = search?.toLowerCase() ?? '';
+    const dateMatch = term.match(/^\d{4}-\d{2}-\d{2}$/);
+    const dateStart = dateMatch ? new Date(`${term}T00:00:00.000Z`) : null;
+    const dateEnd = dateMatch ? new Date(`${term}T23:59:59.999Z`) : null;
+    const statusCondition = ['working', 'active', 'pending'].some((value) => value.includes(term))
+      ? { checkOutAt: null }
+      : ['completed', 'complete'].some((value) => value.includes(term))
+        ? { checkOutAt: { not: null } }
+        : null;
+    const where: Prisma.AttendanceWhereInput = {
+      userId: user.id,
+      ...(search
+        ? {
+            OR: [
+              { checkInSite: { is: { name: { contains: search, mode: 'insensitive' } } } },
+              { checkInSite: { is: { location: { contains: search, mode: 'insensitive' } } } },
+              { checkInShift: { is: { name: { contains: search, mode: 'insensitive' } } } },
+              { checkInShift: { is: { startTime: { contains: search, mode: 'insensitive' } } } },
+              { checkInShift: { is: { endTime: { contains: search, mode: 'insensitive' } } } },
+              { checkOutSite: { is: { name: { contains: search, mode: 'insensitive' } } } },
+              { checkOutShift: { is: { name: { contains: search, mode: 'insensitive' } } } },
+              ...(statusCondition ? [statusCondition] : []),
+              ...(dateStart && dateEnd ? [{ checkInAt: { gte: dateStart, lte: dateEnd } }] : []),
+            ],
+          }
+        : {}),
+    };
     const attendances = await prisma.attendance.findMany({
-      where: { userId: user.id },
+      where,
       orderBy: { checkInAt: 'desc' },
       take: 50,
       include: attendanceInclude,
     });
-    if (!search) return c.json({ attendances });
-
-    const term = search.toLowerCase();
-    const dateText = (value: Date | null) =>
-      value
-        ? [
-            value.toISOString(),
-            value.toLocaleDateString('en-US'),
-            value.toLocaleTimeString('en-US'),
-          ]
-        : [];
-    const filtered = attendances.filter((attendance) => {
-      const status = attendance.checkOutAt
-        ? 'work completed completed'
-        : 'on working active pending';
-      const searchable = [
-        attendance.checkInSite.name,
-        attendance.checkInSite.location,
-        attendance.checkInShift.name,
-        attendance.checkInShift.startTime,
-        attendance.checkInShift.endTime,
-        attendance.checkOutSite?.name ?? '',
-        attendance.checkOutShift?.name ?? '',
-        status,
-        ...dateText(attendance.checkInAt),
-        ...dateText(attendance.checkOutAt),
-      ]
-        .join(' ')
-        .toLowerCase();
-      return searchable.includes(term);
-    });
-    return c.json({ attendances: filtered });
+    return c.json({ attendances });
   })
   .post('/check-in', async (c) => {
     const user = await currentUser(c);

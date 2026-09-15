@@ -1,9 +1,11 @@
 'use client';
-import { CheckCircle2, Circle, Clock3, ListTodo } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Circle, Clock3, ListTodo, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
-import { useTasks } from '@/hooks/use-tasks';
+import { useSearchBar } from '@/hooks/use-search-bar';
+import { tasksServer } from '@/server/tasks.server';
 import type { TaskStatus } from '@/types/task.types';
 
 const statusLabel: Record<TaskStatus, string> = {
@@ -24,12 +26,19 @@ const formatDate = (value: string | null) =>
     : 'No due date';
 
 export default function TasksPage() {
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | TaskStatus>('all');
-  const { tasks, updateStatus } = useTasks();
-  const allTasks = tasks.data?.tasks ?? [];
-  const visibleTasks =
-    filter === 'all' ? allTasks : allTasks.filter((task) => task.status === filter);
-  const completed = allTasks.filter((task) => task.status === 'completed').length;
+  const tasks = useSearchBar({
+    queryKey: ['tasks', { status: filter, limit: 50 }],
+    queryFn: (search) => tasksServer.list({ status: filter, limit: 50, search }),
+  });
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
+      tasksServer.updateStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+  const visibleTasks = tasks.data?.tasks ?? [];
+  const summary = tasks.data?.summary;
   const changeStatus = async (id: string, status: TaskStatus) => {
     try {
       await updateStatus.mutateAsync({ id, status });
@@ -45,14 +54,16 @@ export default function TasksPage() {
         description="Track assigned work, update progress, and stay ahead of due dates."
       />
       <div className="grid gap-4 sm:grid-cols-3">
-        <article className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-600 to-cyan-500 p-5 text-white shadow-sm">
+        <article className="rounded-2xl border border-sky-100 bg-linear-to-br from-sky-600 to-cyan-500 p-5 text-white shadow-sm">
           <div className="flex justify-between">
             <p className="text-sm font-medium text-sky-100">Open tasks</p>
             <ListTodo className="size-5" />
           </div>
-          <p className="mt-5 text-2xl font-bold">
-            {allTasks.filter((task) => task.status !== 'completed').length}
-          </p>
+          {tasks.isLoading ? (
+            <span className="mt-5 block h-7 w-16 animate-pulse rounded bg-white/25" />
+          ) : (
+            <p className="mt-5 text-2xl font-bold">{summary?.open ?? 0}</p>
+          )}
           <p className="mt-1 text-xs text-sky-100">Tasks needing your attention</p>
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -60,9 +71,11 @@ export default function TasksPage() {
             <p className="text-sm font-medium text-slate-500">In progress</p>
             <Clock3 className="size-5 text-amber-600" />
           </div>
-          <p className="mt-5 text-2xl font-bold text-slate-800">
-            {allTasks.filter((task) => task.status === 'in_progress').length}
-          </p>
+          {tasks.isLoading ? (
+            <span className="mt-5 block h-7 w-16 animate-pulse rounded bg-slate-100" />
+          ) : (
+            <p className="mt-5 text-2xl font-bold text-slate-800">{summary?.inProgress ?? 0}</p>
+          )}
           <p className="mt-1 text-xs text-slate-500">Work currently underway</p>
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -70,9 +83,34 @@ export default function TasksPage() {
             <p className="text-sm font-medium text-slate-500">Completed</p>
             <CheckCircle2 className="size-5 text-emerald-600" />
           </div>
-          <p className="mt-5 text-2xl font-bold text-slate-800">{completed}</p>
-          <p className="mt-1 text-xs text-slate-500">Out of {allTasks.length} assigned tasks</p>
+          {tasks.isLoading ? (
+            <span className="mt-5 block h-7 w-16 animate-pulse rounded bg-slate-100" />
+          ) : (
+            <p className="mt-5 text-2xl font-bold text-slate-800">{summary?.completed ?? 0}</p>
+          )}
+          {tasks.isLoading ? (
+            <span className="mt-2 block h-3 w-36 animate-pulse rounded bg-slate-100" />
+          ) : (
+            <p className="mt-1 text-xs text-slate-500">
+              Out of {summary?.total ?? 0} assigned tasks
+            </p>
+          )}
         </article>
+      </div>
+      <div>
+        <label className="relative block w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
+          <input
+            type="search"
+            value={tasks.searchTerm}
+            onChange={(event) => tasks.setSearchTerm(event.target.value)}
+            placeholder="Search task title or description..."
+            className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+          />
+        </label>
+        {tasks.isFetching && !tasks.isLoading ? (
+          <p className="mt-2 text-xs font-medium text-slate-500">Searching tasks…</p>
+        ) : null}
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -94,9 +132,24 @@ export default function TasksPage() {
         </div>
         <div className="divide-y divide-slate-100">
           {tasks.isLoading ? (
-            <p className="p-6 text-sm text-slate-500">Loading tasks…</p>
+            Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="animate-pulse p-5">
+                <div className="flex gap-4">
+                  <span className="size-6 rounded-full bg-slate-100" />
+                  <div className="flex-1 space-y-3">
+                    <span className="block h-4 w-1/3 rounded bg-slate-100" />
+                    <span className="block h-3 w-3/4 rounded bg-slate-100" />
+                    <span className="block h-9 w-full rounded-xl bg-slate-100" />
+                  </div>
+                </div>
+              </div>
+            ))
           ) : visibleTasks.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No tasks in this category.</p>
+            <p className="p-8 text-center text-sm text-slate-500">
+              {tasks.debouncedSearch
+                ? 'No task matched your search.'
+                : 'No tasks in this category.'}
+            </p>
           ) : (
             visibleTasks.map((task) => (
               <article key={task.id} className="p-5">

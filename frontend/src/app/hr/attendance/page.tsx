@@ -1,8 +1,9 @@
 'use client';
-import { CalendarDays, Clock3, Timer, UsersRound } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CalendarDays, Timer, UsersRound } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
-import { useHrAttendance } from '@/hooks/use-hr-attendance';
+import { hrAttendanceServer } from '@/server/hr-attendance.server';
 import { Pagination } from '@/components/shared/Pagination';
 const today = new Date().toISOString().slice(0, 10);
 const time = (value: string | null) =>
@@ -21,10 +22,13 @@ export default function AttendancePage() {
   const [date, setDate] = useState(today);
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const report = useHrAttendance(date);
+  const params = { date, status: filter, page, limit: 10 };
+  const report = useQuery({
+    queryKey: ['hr', 'attendance', params],
+    queryFn: () => hrAttendanceServer.list(params),
+  });
   const data = report.data;
-  const rows = data?.attendance.filter((row) => filter === 'all' || row.status === filter) ?? [];
-  const visibleRows = rows.slice((page - 1) * 10, page * 10);
+  const rows = data?.attendance ?? [];
   return (
     <section className="w-full space-y-6">
       <div>
@@ -33,19 +37,43 @@ export default function AttendancePage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-800">Attendance</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Review employee check-in, check-out, absence, late arrival and overtime.
+          Review employee check-in, check-out, absence and overtime.
         </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Employees', value: data?.summary.total ?? 0, icon: UsersRound },
+          { label: 'Present', value: data?.summary.present ?? 0, icon: UsersRound },
+          { label: 'Absent', value: data?.summary.absent ?? 0, icon: UsersRound },
+          { label: 'Overtime', value: data?.summary.overtime ?? 0, icon: Timer },
+        ].map(({ label, value, icon: Icon }) => (
+          <article
+            key={label}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <Icon className="size-5 text-emerald-600" />
+            {report.isLoading ? (
+              <span className="mt-4 block h-7 w-16 animate-pulse rounded bg-slate-100" />
+            ) : (
+              <p className="mt-4 text-2xl font-bold text-slate-800">{value}</p>
+            )}
+            <p className="mt-1 text-sm text-slate-500">{label}</p>
+          </article>
+        ))}
       </div>
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <CalendarDays className="size-5 text-emerald-600" />
         <input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => {
+            setDate(e.target.value);
+            setPage(1);
+          }}
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400"
         />
         <div className="ml-auto flex flex-wrap gap-2">
-          {['all', 'present', 'late', 'absent', 'working'].map((item) => (
+          {['all', 'present', 'absent', 'working'].map((item) => (
             <button
               key={item}
               onClick={() => {
@@ -58,24 +86,6 @@ export default function AttendancePage() {
             </button>
           ))}
         </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: 'Employees', value: data?.summary.total ?? 0, icon: UsersRound },
-          { label: 'Present', value: data?.summary.present ?? 0, icon: UsersRound },
-          { label: 'Absent', value: data?.summary.absent ?? 0, icon: UsersRound },
-          { label: 'Late', value: data?.summary.late ?? 0, icon: Clock3 },
-          { label: 'Overtime', value: data?.summary.overtime ?? 0, icon: Timer },
-        ].map(({ label, value, icon: Icon }) => (
-          <article
-            key={label}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <Icon className="size-5 text-emerald-600" />
-            <p className="mt-4 text-2xl font-bold text-slate-800">{value}</p>
-            <p className="mt-1 text-sm text-slate-500">{label}</p>
-          </article>
-        ))}
       </div>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-5">
@@ -96,8 +106,8 @@ export default function AttendancePage() {
                 <th className="px-5 py-3">Check out</th>
                 <th className="px-5 py-3">Check-in photo</th>
                 <th className="px-5 py-3">Check-out photo</th>
-                <th className="px-5 py-3">Site / shift</th>
-                <th className="px-5 py-3">Late</th>
+                <th className="px-5 py-3">Site</th>
+                <th className="px-5 py-3">Shift</th>
                 <th className="px-5 py-3">Overtime</th>
               </tr>
             </thead>
@@ -114,7 +124,7 @@ export default function AttendancePage() {
                       ))}
                     </tr>
                   ))
-                : visibleRows.map((row) => (
+                : rows.map((row) => (
                     <tr key={row.employee.id}>
                       <td className="px-5 py-4">
                         <p className="font-semibold text-slate-800">
@@ -170,17 +180,10 @@ export default function AttendancePage() {
                         )}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
-                        {row.attendance ? (
-                          <>
-                            <p>{row.attendance.checkInSite.name}</p>
-                            <p className="text-xs">{row.attendance.checkInShift.name}</p>
-                          </>
-                        ) : (
-                          '—'
-                        )}
+                        {row.attendance?.checkInSite.name ?? '—'}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
-                        {row.lateMinutes ? `${row.lateMinutes} min` : '—'}
+                        {row.attendance?.checkInShift.name ?? '—'}
                       </td>
                       <td className="px-5 py-4 font-semibold text-emerald-700">
                         {row.overtimeMinutes ? `${row.overtimeMinutes} min` : '—'}
@@ -191,7 +194,12 @@ export default function AttendancePage() {
           </table>
         </div>
         <div className="border-t border-slate-100 px-5 py-4">
-          <Pagination page={page} totalItems={rows.length} pageSize={10} onPageChange={setPage} />
+          <Pagination
+            page={data?.pagination.page ?? page}
+            totalItems={data?.pagination.total ?? 0}
+            pageSize={10}
+            onPageChange={setPage}
+          />
         </div>
       </section>
     </section>

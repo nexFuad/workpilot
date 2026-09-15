@@ -7,32 +7,55 @@ datasource db {
 }
 
 model User {
-  id                 String                 @id @default(cuid())
-  employeeId         String
-  companyName        String
-  fullName           String?
-  phone              String?
-  address            String?
-  profileImage       String?
-  passwordHash       String
-  role               String
-  isActive           Boolean                @default(true)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  sessions           RefreshSession[]
-  attendances        Attendance[]
-  leaveRequests      LeaveRequest[]
-  salaryPayments     SalaryPayment[]
-  salaryAdvances     SalaryAdvanceRequest[]
-  loanRequests       LoanRequest[]
-  loans              Loan[]
-  tasks              Task[]
-  projectAssignments ProjectAssignment[]
-  documents          EmployeeDocument[]
-  announcementReads  AnnouncementRead[]
+  id                      String                 @id @default(cuid())
+  employeeId              String
+  companyName             String
+  fullName                String?
+  email                   String?
+  phone                   String?
+  address                 String?
+  profileImage            String?
+  gender                  String?
+  department              String?
+  designation             String?
+  joiningDate             DateTime?
+  employmentType          String?
+  employmentStatus        String                 @default("active")
+  defaultSiteId           String?
+  defaultShiftId          String?
+  basicSalary             Int                    @default(0)
+  salaryAllowances        Int                    @default(0)
+  salaryBonus             Int                    @default(0)
+  salaryTax               Int                    @default(0)
+  salaryProvidentFund     Int                    @default(0)
+  salaryType              String                 @default("monthly")
+  emergencyContactName    String?
+  emergencyContactPhone   String?
+  emergencyContactAddress String?
+  passwordHash            String
+  role                    String
+  isActive                Boolean                @default(true)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  sessions                RefreshSession[]
+  attendances             Attendance[]
+  leaveRequests           LeaveRequest[]
+  salaryPayments          SalaryPayment[]
+  salaryAdvances          SalaryAdvanceRequest[]
+  loanRequests            LoanRequest[]
+  loans                   Loan[]
+  tasks                   Task[]
+  projectAssignments      ProjectAssignment[]
+  documents               EmployeeDocument[]
+  announcementReads       AnnouncementRead[]
+  defaultSite             Site?                  @relation(fields: [defaultSiteId], references: [id], onDelete: SetNull)
+  defaultShift            Shift?                 @relation(fields: [defaultShiftId], references: [id], onDelete: SetNull)
 
   @@unique([employeeId, companyName])
+  @@unique([email, companyName])
   @@index([role])
+  @@index([defaultSiteId])
+  @@index([defaultShiftId])
 }
 
 model Announcement {
@@ -201,6 +224,7 @@ model Site {
   createdAt           DateTime     @default(now())
   checkInAttendances  Attendance[] @relation("CheckInSite")
   checkOutAttendances Attendance[] @relation("CheckOutSite")
+  employees           User[]
 }
 
 model Shift {
@@ -212,6 +236,7 @@ model Shift {
   createdAt           DateTime     @default(now())
   checkInAttendances  Attendance[] @relation("CheckInShift")
   checkOutAttendances Attendance[] @relation("CheckOutShift")
+  employees           User[]
 }
 
 model Attendance {

@@ -1,4 +1,6 @@
 import { apiRequest } from './auth.server';
+import { listQuery } from '@/lib/list-query';
+import type { ListParams, PaginationMeta } from '@/types/pagination.types';
 export type HrLeave = {
   id: string;
   leaveType: string;
@@ -10,7 +12,10 @@ export type HrLeave = {
   user: { employeeId: string; fullName: string | null; companyName: string };
 };
 export const hrLeaveServer = {
-  list: () => apiRequest<{ requests: HrLeave[] }>('/api/hr/leaves'),
+  list: (params: ListParams = {}) =>
+    apiRequest<{ requests: HrLeave[]; pagination: PaginationMeta }>(
+      `/api/hr/leaves${listQuery(params)}`,
+    ),
   updateStatus: (id: string, status: 'approved' | 'rejected') =>
     apiRequest<{ request: HrLeave }>(`/api/hr/leaves/${id}/status`, {
       method: 'PATCH',

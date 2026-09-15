@@ -18,6 +18,7 @@ const cookieBase = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
   sameSite: env.NODE_ENV === 'production' ? ('None' as const) : ('Lax' as const),
+  partitioned: env.NODE_ENV === 'production',
   path: '/',
 };
 
@@ -29,6 +30,11 @@ function setAuthCookies(
 ) {
   setCookie(c, ACCESS_COOKIE, accessToken, { ...cookieBase, maxAge: 15 * 60 });
   setCookie(c, REFRESH_COOKIE, refreshToken, { ...cookieBase, maxAge: refreshDays * 24 * 60 * 60 });
+}
+
+function clearAuthCookies(c: Parameters<typeof deleteCookie>[0]) {
+  deleteCookie(c, ACCESS_COOKIE, cookieBase);
+  deleteCookie(c, REFRESH_COOKIE, cookieBase);
 }
 
 export const authRoutes = new Hono()
@@ -52,15 +58,13 @@ export const authRoutes = new Hono()
       setAuthCookies(c, session.accessToken, session.refreshToken, session.refreshDays);
       return c.json({ user: session.user });
     } catch {
-      deleteCookie(c, ACCESS_COOKIE, { path: '/' });
-      deleteCookie(c, REFRESH_COOKIE, { path: '/' });
+      clearAuthCookies(c);
       return c.json({ message: 'Your session has expired. Please sign in again.' }, 401);
     }
   })
   .post('/logout', async (c) => {
     await revokeRefreshToken(getCookie(c, REFRESH_COOKIE));
-    deleteCookie(c, ACCESS_COOKIE, { path: '/' });
-    deleteCookie(c, REFRESH_COOKIE, { path: '/' });
+    clearAuthCookies(c);
     return c.json({ message: 'Logged out successfully.' });
   })
   .get('/session', async (c) => {
@@ -74,8 +78,7 @@ export const authRoutes = new Hono()
         setAuthCookies(c, session.accessToken, session.refreshToken, session.refreshDays);
         return c.json({ user: session.user });
       } catch {
-        deleteCookie(c, ACCESS_COOKIE, { path: '/' });
-        deleteCookie(c, REFRESH_COOKIE, { path: '/' });
+        clearAuthCookies(c);
         return c.json({ user: null });
       }
     }
@@ -88,8 +91,52 @@ export const authRoutes = new Hono()
     }
   })
   .patch('/profile', async (c) => {
-    try { const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? ''); const parsed = profileSchema.safeParse(await c.req.json().catch(() => null)); if (!parsed.success) return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid profile.' }, 400); const updated = await prisma.user.update({ where: { id: user.id }, data: { ...parsed.data, profileImage: parsed.data.profileImage || null } }); return c.json({ user: { id: updated.id, employeeId: updated.employeeId, companyName: updated.companyName, role: updated.role, fullName: updated.fullName, phone: updated.phone, address: updated.address, profileImage: updated.profileImage } }); } catch { return c.json({ message: 'Unauthorized.' }, 401); }
+    try {
+      const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '');
+      const parsed = profileSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success)
+        return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid profile.' }, 400);
+      const input = parsed.data;
+      const updated = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          ...(input.fullName !== undefined ? { fullName: input.fullName || null } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
+          ...(input.address !== undefined ? { address: input.address || null } : {}),
+          ...(input.profileImage !== undefined ? { profileImage: input.profileImage || null } : {}),
+        },
+      });
+      return c.json({
+        user: {
+          id: updated.id,
+          employeeId: updated.employeeId,
+          companyName: updated.companyName,
+          role: updated.role,
+          fullName: updated.fullName,
+          phone: updated.phone,
+          address: updated.address,
+          profileImage: updated.profileImage,
+        },
+      });
+    } catch {
+      return c.json({ message: 'Unauthorized.' }, 401);
+    }
   })
   .patch('/password', async (c) => {
-    try { const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? ''); const parsed = passwordSchema.safeParse(await c.req.json().catch(() => null)); if (!parsed.success) return c.json({ message: 'New password must have at least 8 characters.' }, 400); const account = await prisma.user.findUnique({ where: { id: user.id } }); if (!account || !(await compare(parsed.data.currentPassword, account.passwordHash))) return c.json({ message: 'Current password is incorrect.' }, 400); await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(parsed.data.newPassword, 12) } }); return c.json({ message: 'Password updated.' }); } catch { return c.json({ message: 'Unauthorized.' }, 401); }
+    try {
+      const user = await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '');
+      const parsed = passwordSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success)
+        return c.json({ message: 'New password must have at least 8 characters.' }, 400);
+      const account = await prisma.user.findUnique({ where: { id: user.id } });
+      if (!account || !(await compare(parsed.data.currentPassword, account.passwordHash)))
+        return c.json({ message: 'Current password is incorrect.' }, 400);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: await hash(parsed.data.newPassword, 12) },
+      });
+      return c.json({ message: 'Password updated.' });
+    } catch {
+      return c.json({ message: 'Unauthorized.' }, 401);
+    }
   });

@@ -1,4 +1,5 @@
 'use client';
+import { useQuery } from '@tanstack/react-query';
 import {
   BellRing,
   CalendarCheck,
@@ -9,14 +10,18 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
-import { useEmployeeDashboard } from '@/hooks/use-dashboard';
-const money = new Intl.NumberFormat('en-BD', {
+import { dashboardServer } from '@/server/dashboard.server';
+const money = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'BDT',
+  currency: 'USD',
   maximumFractionDigits: 0,
 });
 export default function EmployeePage() {
-  const dashboard = useEmployeeDashboard();
+  const dashboard = useQuery({
+    queryKey: ['dashboard', 'employee'],
+    queryFn: dashboardServer.employee,
+    refetchInterval: 60000,
+  });
   const data = dashboard.data;
   const cards = [
     {
@@ -55,22 +60,33 @@ export default function EmployeePage() {
         description="Your live work overview, updated from your WorkPilot records."
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, value, note, icon: Icon, href }) => (
-          <Link
-            key={label}
-            href={href}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500">{label}</p>
-              <span className="grid size-9 place-items-center rounded-xl bg-sky-50 text-sky-600">
-                <Icon className="size-5" />
-              </span>
-            </div>
-            <p className="mt-5 text-2xl font-bold text-slate-800">{value}</p>
-            <p className="mt-1 truncate text-xs text-slate-500">{note}</p>
-          </Link>
-        ))}
+        {dashboard.isLoading
+          ? Array.from({ length: 4 }, (_, index) => (
+              <div
+                key={index}
+                className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <span className="block h-4 w-28 rounded bg-slate-100" />
+                <span className="mt-7 block h-7 w-36 rounded bg-slate-100" />
+                <span className="mt-3 block h-3 w-44 rounded bg-slate-100" />
+              </div>
+            ))
+          : cards.map(({ label, value, note, icon: Icon, href }) => (
+              <Link
+                key={label}
+                href={href}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-500">{label}</p>
+                  <span className="grid size-9 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                    <Icon className="size-5" />
+                  </span>
+                </div>
+                <p className="mt-5 text-2xl font-bold text-slate-800">{value}</p>
+                <p className="mt-1 truncate text-xs text-slate-500">{note}</p>
+              </Link>
+            ))}
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -85,7 +101,12 @@ export default function EmployeePage() {
           </div>
           <div className="divide-y divide-slate-100">
             {dashboard.isLoading ? (
-              <p className="p-6 text-sm text-slate-500">Loading dashboard…</p>
+              Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="animate-pulse p-5">
+                  <span className="block h-4 w-1/2 rounded bg-slate-100" />
+                  <span className="mt-3 block h-3 w-1/3 rounded bg-slate-100" />
+                </div>
+              ))
             ) : data?.dueTasks.length ? (
               data.dueTasks.map((task) => (
                 <Link
@@ -119,54 +140,76 @@ export default function EmployeePage() {
             <BellRing className="size-5 text-sky-600" />
             <div>
               <h2 className="font-bold text-slate-800">Latest announcements</h2>
-              <p className="text-sm text-slate-500">From HR & admin</p>
+              <p className="text-sm text-slate-500">From HR</p>
             </div>
           </div>
           <div className="divide-y divide-slate-100">
-            {data?.announcements.map((item) => (
-              <Link
-                href="/employee/announcements"
-                key={item.id}
-                className="block p-5 hover:bg-slate-50"
-              >
-                <p className="font-semibold text-slate-800">{item.title}</p>
-                <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.content}</p>
-              </Link>
-            ))}
+            {dashboard.isLoading
+              ? Array.from({ length: 4 }, (_, index) => (
+                  <div key={index} className="animate-pulse p-5">
+                    <span className="block h-4 w-1/2 rounded bg-slate-100" />
+                    <span className="mt-3 block h-3 w-full rounded bg-slate-100" />
+                  </div>
+                ))
+              : data?.announcements.map((item) => (
+                  <Link
+                    href="/employee/announcements"
+                    key={item.id}
+                    className="block p-5 hover:bg-slate-50"
+                  >
+                    <p className="font-semibold text-slate-800">{item.title}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.content}</p>
+                  </Link>
+                ))}
           </div>
         </section>
       </div>
       <section className="grid gap-4 sm:grid-cols-3">
-        <Link
-          href="/employee/leave"
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
-          <CalendarCheck className="size-5 text-sky-600" />
-          <h2 className="mt-4 font-bold text-slate-800">Leave requests</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {data?.pendingLeaves ?? 0} pending request(s)
-          </p>
-        </Link>
-        <Link
-          href="/employee/documents"
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
-          <FileText className="size-5 text-amber-600" />
-          <h2 className="mt-4 font-bold text-slate-800">Documents</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {data?.pendingDocuments ?? 0} awaiting review
-          </p>
-        </Link>
-        <Link
-          href="/employee/loans"
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
-          <WalletCards className="size-5 text-emerald-600" />
-          <h2 className="mt-4 font-bold text-slate-800">Loan repayment</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Monthly: {money.format(data?.loanInstallment ?? 0)}
-          </p>
-        </Link>
+        {dashboard.isLoading ? (
+          Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className="h-32 animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <span className="block size-5 rounded bg-slate-100" />
+              <span className="mt-4 block h-4 w-32 rounded bg-slate-100" />
+              <span className="mt-3 block h-3 w-40 rounded bg-slate-100" />
+            </div>
+          ))
+        ) : (
+          <>
+            <Link
+              href="/employee/leave"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <CalendarCheck className="size-5 text-sky-600" />
+              <h2 className="mt-4 font-bold text-slate-800">Leave requests</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {data?.pendingLeaves ?? 0} pending request(s)
+              </p>
+            </Link>
+            <Link
+              href="/employee/documents"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <FileText className="size-5 text-amber-600" />
+              <h2 className="mt-4 font-bold text-slate-800">Documents</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {data?.pendingDocuments ?? 0} awaiting review
+              </p>
+            </Link>
+            <Link
+              href="/employee/loans"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <WalletCards className="size-5 text-emerald-600" />
+              <h2 className="mt-4 font-bold text-slate-800">Loan repayment</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Monthly: {money.format(data?.loanInstallment ?? 0)}
+              </p>
+            </Link>
+          </>
+        )}
       </section>
     </section>
   );

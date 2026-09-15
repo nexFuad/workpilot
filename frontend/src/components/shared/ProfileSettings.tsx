@@ -1,6 +1,18 @@
-
 'use client';
-import { Camera, LockKeyhole, Save, UserRound } from 'lucide-react';
+import {
+  Building2,
+  Camera,
+  Eye,
+  EyeOff,
+  IdCard,
+  LockKeyhole,
+  MapPin,
+  Phone,
+  Save,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react';
+import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,25 +23,31 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
   const { user, updateProfile, updatePassword } = useAuth();
   const { uploadFile, isUploading } = useCloudinaryUpload();
   const imageRef = useRef<HTMLInputElement>(null);
-  const [profile, setProfile] = useState({
-    fullName: '',
-    phone: '',
-    address: '',
-    profileImage: '',
-  });
+  const [profile, setProfile] = useState(() => ({
+    fullName: user?.fullName ?? '',
+    phone: user?.phone ?? '',
+    address: user?.address ?? '',
+    profileImage: user?.profileImage ?? '',
+  }));
   const [password, setPassword] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+  const [visiblePassword, setVisiblePassword] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
+
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await updateProfile.mutateAsync({
-        fullName: profile.fullName || user?.fullName || '',
-        phone: profile.phone || user?.phone || '',
-        address: profile.address || user?.address || '',
-        profileImage: profile.profileImage || user?.profileImage || '',
+        fullName: profile.fullName,
+        phone: profile.phone,
+        address: profile.address,
+        profileImage: profile.profileImage,
       });
       toast.success('Profile updated successfully.');
     } catch (error) {
@@ -49,6 +67,8 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
   };
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!password.currentPassword || !password.newPassword || !password.confirmPassword)
+      return toast.error('Complete all password fields.');
     if (password.newPassword !== password.confirmPassword)
       return toast.error('New passwords do not match.');
     try {
@@ -62,12 +82,14 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
   return (
     <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
       <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mx-auto grid size-24 place-items-center overflow-hidden rounded-2xl bg-sky-100 text-sky-700">
-          {profile.profileImage || user?.profileImage ? (
-            <img
-              src={profile.profileImage || user?.profileImage || ''}
+        <div className="relative mx-auto grid size-24 place-items-center overflow-hidden rounded-2xl bg-sky-100 text-sky-700">
+          {profile.profileImage ? (
+            <Image
+              src={profile.profileImage}
               alt="Profile"
-              className="size-full object-cover"
+              fill
+              sizes="96px"
+              className="object-cover"
             />
           ) : (
             <UserRound className="size-10" />
@@ -88,10 +110,57 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
           <Camera className="size-4" />
           {isUploading ? 'Uploading…' : 'Change photo'}
         </button>
-        <div className="mt-6 border-t border-slate-100 pt-5 text-sm">
-          <p className="font-bold text-slate-800">{user?.fullName || 'Employee profile'}</p>
-          <p className="mt-1 text-slate-500">{user?.employeeId}</p>
+        <div className="mt-6 border-t border-slate-100 pt-5 text-center">
+          <p className="text-base font-bold text-slate-800">
+            {profile.fullName || 'Name not added'}
+          </p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-sky-600">
+            {user?.role || 'Account'}
+          </p>
         </div>
+        <dl className="mt-5 space-y-3 border-t border-slate-100 pt-5 text-sm">
+          <div className="flex items-start gap-3">
+            <IdCard className="mt-0.5 size-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <dt className="text-xs text-slate-400">Employee ID</dt>
+              <dd className="truncate font-semibold text-slate-700">{user?.employeeId || '—'}</dd>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Phone className="mt-0.5 size-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <dt className="text-xs text-slate-400">Phone number</dt>
+              <dd className="truncate font-semibold text-slate-700">
+                {profile.phone || 'Not added'}
+              </dd>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Building2 className="mt-0.5 size-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <dt className="text-xs text-slate-400">Company</dt>
+              <dd className="truncate font-semibold text-slate-700">
+                {user?.companyName || 'Not added'}
+              </dd>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <dt className="text-xs text-slate-400">Account role</dt>
+              <dd className="font-semibold capitalize text-slate-700">{user?.role || '—'}</dd>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <dt className="text-xs text-slate-400">Address</dt>
+              <dd className="line-clamp-3 font-semibold leading-5 text-slate-700">
+                {profile.address || 'Not added'}
+              </dd>
+            </div>
+          </div>
+        </dl>
       </aside>
       <div className="space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -101,9 +170,10 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
             <label className="text-sm font-semibold text-slate-700">
               Full name
               <input
-                value={profile.fullName || user?.fullName || ''}
+                value={profile.fullName}
                 onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
                 className={field}
+                placeholder="Enter your full name (optional)"
               />
             </label>
             <label className="text-sm font-semibold text-slate-700">
@@ -113,9 +183,10 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
             <label className="text-sm font-semibold text-slate-700">
               Phone number
               <input
-                value={profile.phone || user?.phone || ''}
+                value={profile.phone}
                 onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                 className={field}
+                placeholder="Enter phone number (optional)"
               />
             </label>
             <label className="text-sm font-semibold text-slate-700">
@@ -125,15 +196,19 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
               Address
               <textarea
-                value={profile.address || user?.address || ''}
+                value={profile.address}
                 onChange={(e) => setProfile({ ...profile, address: e.target.value })}
                 rows={3}
                 className={field}
+                placeholder="Enter address (optional)"
               />
             </label>
-            <button className="flex w-fit items-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white sm:col-span-2">
+            <button
+              disabled={updateProfile.isPending || isUploading}
+              className="flex w-fit items-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+            >
               <Save className="size-4" />
-              Save profile
+              {updateProfile.isPending ? 'Saving…' : 'Save profile'}
             </button>
           </form>
         </section>
@@ -153,16 +228,38 @@ export function ProfileSettings({ title = 'Profile settings' }: { title?: string
                   : key === 'newPassword'
                     ? 'New password'
                     : 'Confirm password'}
-                <input
-                  type="password"
-                  value={password[key]}
-                  onChange={(e) => setPassword({ ...password, [key]: e.target.value })}
-                  className={field}
-                />
+                <div className="relative mt-1.5">
+                  <input
+                    type={visiblePassword[key] ? 'text' : 'password'}
+                    required
+                    minLength={key === 'currentPassword' ? 1 : 8}
+                    value={password[key]}
+                    onChange={(e) => setPassword({ ...password, [key]: e.target.value })}
+                    className={`${field} mt-0 pr-11`}
+                  />
+                  <button
+                    type="button"
+                    aria-label={visiblePassword[key] ? 'Hide password' : 'Show password'}
+                    aria-pressed={visiblePassword[key]}
+                    onClick={() =>
+                      setVisiblePassword((current) => ({ ...current, [key]: !current[key] }))
+                    }
+                    className="absolute inset-y-0 right-2.5 my-auto grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    {visiblePassword[key] ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </button>
+                </div>
               </label>
             ))}
-            <button className="w-fit rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 sm:col-span-3">
-              Update password
+            <button
+              disabled={updatePassword.isPending}
+              className="w-fit rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-3"
+            >
+              {updatePassword.isPending ? 'Updating…' : 'Update password'}
             </button>
           </form>
         </section>

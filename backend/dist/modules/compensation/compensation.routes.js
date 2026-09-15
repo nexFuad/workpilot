@@ -11,18 +11,38 @@ async function currentUser(c) {
         return null;
     }
 }
-const isReviewer = (role) => role === 'admin' || role === 'hr';
+const isReviewer = (role) => role === 'hr';
 export const compensationRoutes = new Hono()
     .get('/salary', async (c) => {
     const user = await currentUser(c);
     if (!user)
         return c.json({ message: 'Unauthorized.' }, 401);
+    const requestedMonth = c.req.query('month')?.trim();
     const [payments, advances, loans] = await Promise.all([
         prisma.salaryPayment.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
-        prisma.salaryAdvanceRequest.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
+        prisma.salaryAdvanceRequest.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' },
+        }),
         prisma.loan.findMany({ where: { userId: user.id, status: 'active' } }),
     ]);
-    return c.json({ payments, advances, loans });
+    const selectedPayment = requestedMonth
+        ? (payments.find((payment) => payment.month === requestedMonth) ?? null)
+        : (payments[0] ?? null);
+    const approvedAdvanceAmount = selectedPayment
+        ? advances
+            .filter((advance) => advance.status === 'approved' && advance.settlementMonth === selectedPayment.month)
+            .reduce((total, advance) => total + advance.amount, 0)
+        : 0;
+    const activeLoanInstallment = loans.reduce((total, loan) => total + loan.installment, 0);
+    return c.json({
+        payments,
+        advances,
+        loans,
+        selectedPayment,
+        approvedAdvanceAmount,
+        activeLoanInstallment,
+    });
 })
     .post('/salary/advances', async (c) => {
     const user = await currentUser(c);
@@ -31,13 +51,17 @@ export const compensationRoutes = new Hono()
     const parsed = advanceRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
         return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid advance request.' }, 400);
-    const payment = await prisma.salaryPayment.findFirst({ where: { userId: user.id, month: parsed.data.settlementMonth } });
+    const payment = await prisma.salaryPayment.findFirst({
+        where: { userId: user.id, month: parsed.data.settlementMonth },
+    });
     if (!payment)
         return c.json({ message: 'No salary record exists for the selected month.' }, 400);
     const netSalary = payment.basic + payment.allowances + payment.bonus - payment.tax - payment.providentFund;
     if (parsed.data.amount > netSalary)
         return c.json({ message: 'Advance cannot exceed your net salary.' }, 400);
-    const advance = await prisma.salaryAdvanceRequest.create({ data: { ...parsed.data, userId: user.id } });
+    const advance = await prisma.salaryAdvanceRequest.create({
+        data: { ...parsed.data, userId: user.id },
+    });
     return c.json({ advance }, 201);
 })
     .get('/loans', async (c) => {
@@ -48,7 +72,11 @@ export const compensationRoutes = new Hono()
         prisma.loanRequest.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
         prisma.loan.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
     ]);
-    return c.json({ requests, loans });
+    return c.json({
+        requests,
+        loans,
+        activeLoan: loans.find((loan) => loan.status === 'active') ?? null,
+    });
 })
     .post('/loans', async (c) => {
     const user = await currentUser(c);
@@ -65,11 +93,16 @@ export const compensationRoutes = new Hono()
     if (!reviewer)
         return c.json({ message: 'Unauthorized.' }, 401);
     if (!isReviewer(reviewer.role))
-        return c.json({ message: 'Only HR or admin can review requests.' }, 403);
+        return c.json({ message: 'Only HR can review requests.' }, 403);
     const parsed = reviewSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
         return c.json({ message: 'Invalid review status.' }, 400);
-    const advance = await prisma.salaryAdvanceRequest.update({ where: { id: c.req.param('id') }, data: { status: parsed.data.status, reviewedAt: new Date() } }).catch(() => null);
+    const advance = await prisma.salaryAdvanceRequest
+        .update({
+        where: { id: c.req.param('id') },
+        data: { status: parsed.data.status, reviewedAt: new Date() },
+    })
+        .catch(() => null);
     if (!advance)
         return c.json({ message: 'Advance request not found.' }, 404);
     return c.json({ advance });
@@ -79,14 +112,31 @@ export const compensationRoutes = new Hono()
     if (!reviewer)
         return c.json({ message: 'Unauthorized.' }, 401);
     if (!isReviewer(reviewer.role))
-        return c.json({ message: 'Only HR or admin can review requests.' }, 403);
+        return c.json({ message: 'Only HR can review requests.' }, 403);
     const parsed = reviewSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
         return c.json({ message: 'Invalid review status.' }, 400);
-    const request = await prisma.loanRequest.update({ where: { id: c.req.param('id') }, data: { status: parsed.data.status, reviewedAt: new Date() } }).catch(() => null);
+    const request = await prisma.loanRequest
+        .update({
+        where: { id: c.req.param('id') },
+        data: { status: parsed.data.status, reviewedAt: new Date() },
+    })
+        .catch(() => null);
     if (!request)
         return c.json({ message: 'Loan request not found.' }, 404);
     if (parsed.data.status === 'approved')
-        await prisma.loan.upsert({ where: { requestId: request.id }, update: {}, create: { userId: request.userId, requestId: request.id, principal: request.amount, outstanding: request.amount, installment: Math.ceil(request.amount / request.tenure), tenure: request.tenure, nextDue: new Date() } });
+        await prisma.loan.upsert({
+            where: { requestId: request.id },
+            update: {},
+            create: {
+                userId: request.userId,
+                requestId: request.id,
+                principal: request.amount,
+                outstanding: request.amount,
+                installment: Math.ceil(request.amount / request.tenure),
+                tenure: request.tenure,
+                nextDue: new Date(),
+            },
+        });
     return c.json({ request });
 });

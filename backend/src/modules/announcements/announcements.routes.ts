@@ -1,5 +1,6 @@
 import { getCookie } from 'hono/cookie';
 import { Hono, type Context } from 'hono';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { getCurrentUser } from '../auth/auth.service.js';
 
@@ -15,18 +16,38 @@ export const announcementRoutes = new Hono()
   .get('/', async (c) => {
     const user = await currentUser(c);
     if (!user) return c.json({ message: 'Unauthorized.' }, 401);
+    const search = c.req.query('search')?.trim();
+    const visibleWhere: Prisma.AnnouncementWhereInput = { isActive: true };
+    const where: Prisma.AnnouncementWhereInput = {
+      ...visibleWhere,
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { content: { contains: search, mode: 'insensitive' } },
+              { priority: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
-    const announcements = await prisma.announcement.findMany({
-      where: { isActive: true },
-      orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }],
-      include: {
-        reads: {
-          where: { userId: user.id },
-          select: { readAt: true },
-          take: 1,
+    const [announcements, total, read] = await Promise.all([
+      prisma.announcement.findMany({
+        where,
+        orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }],
+        include: {
+          reads: {
+            where: { userId: user.id },
+            select: { readAt: true },
+            take: 1,
+          },
         },
-      },
-    });
+      }),
+      prisma.announcement.count({ where: visibleWhere }),
+      prisma.announcementRead.count({
+        where: { userId: user.id, announcement: { is: visibleWhere } },
+      }),
+    ]);
     const items = announcements.map(({ reads, ...announcement }) => ({
       ...announcement,
       isRead: reads.length > 0,
@@ -36,8 +57,8 @@ export const announcementRoutes = new Hono()
     return c.json({
       announcements: items,
       summary: {
-        total: items.length,
-        unread: items.filter((item) => !item.isRead).length,
+        total,
+        unread: Math.max(total - read, 0),
       },
     });
   })

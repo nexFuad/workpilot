@@ -1,6 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BellRing,
   CalendarDays,
@@ -9,12 +10,14 @@ import {
   LoaderCircle,
   MailOpen,
   Pin,
+  Search,
   X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
-import { useAnnouncements } from '@/hooks/use-announcements';
+import { useSearchBar } from '@/hooks/use-search-bar';
+import { announcementsServer } from '@/server/announcements.server';
 import type { Announcement } from '@/types/announcement.types';
 
 const priorityStyles: Record<string, string> = {
@@ -49,7 +52,16 @@ function NotificationSkeleton() {
 }
 
 export default function AnnouncementsPage() {
-  const api = useAnnouncements();
+  const queryClient = useQueryClient();
+  const announcements = useSearchBar({
+    queryKey: ['announcements'],
+    queryFn: announcementsServer.list,
+  });
+  const markRead = useMutation({
+    mutationFn: announcementsServer.markRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['announcements'] }),
+  });
+  const api = { announcements, markRead };
   const [selected, setSelected] = useState<Announcement | null>(null);
   const items = api.announcements.data?.announcements ?? [];
   const summary = api.announcements.data?.summary ?? { total: 0, unread: 0 };
@@ -91,16 +103,36 @@ export default function AnnouncementsPage() {
                 className={`size-5 ${index === 1 && value > 0 ? 'text-rose-600' : 'text-sky-600'}`}
               />
             </div>
-            <p className="mt-4 text-2xl font-bold text-slate-800">{value}</p>
+            {api.announcements.isLoading ? (
+              <span className="mt-4 block h-7 w-14 animate-pulse rounded bg-slate-100" />
+            ) : (
+              <p className="mt-4 text-2xl font-bold text-slate-800">{value}</p>
+            )}
           </article>
         ))}
+      </div>
+
+      <div>
+        <label className="relative block w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
+          <input
+            type="search"
+            value={api.announcements.searchTerm}
+            onChange={(event) => api.announcements.setSearchTerm(event.target.value)}
+            placeholder="Search announcement title, content or priority..."
+            className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+          />
+        </label>
+        {api.announcements.isFetching && !api.announcements.isLoading ? (
+          <p className="mt-2 text-xs font-medium text-slate-500">Searching announcements…</p>
+        ) : null}
       </div>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 p-5">
           <div>
             <h2 className="font-bold text-slate-800">Company notices</h2>
-            <p className="mt-1 text-sm text-slate-500">Published by HR and administrators.</p>
+            <p className="mt-1 text-sm text-slate-500">Published by HR.</p>
           </div>
           {summary.unread > 0 && (
             <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
@@ -127,7 +159,9 @@ export default function AnnouncementsPage() {
             </div>
           ) : items.length === 0 ? (
             <p className="p-10 text-center text-sm text-slate-500">
-              No announcements at the moment.
+              {api.announcements.debouncedSearch
+                ? 'No announcement matched your search.'
+                : 'No announcements at the moment.'}
             </p>
           ) : (
             items.map((item) => (

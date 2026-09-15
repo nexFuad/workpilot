@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { env } from '../config/env.js';
 
-export type AuthRole = 'admin' | 'hr' | 'employee';
+export type AuthRole = 'hr' | 'employee';
 export type TokenPayload = {
   userId: string;
   role: AuthRole;

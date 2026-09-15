@@ -1,4 +1,6 @@
 import { apiRequest } from './auth.server';
+import { listQuery } from '@/lib/list-query';
+import type { ListParams, PaginationMeta } from '@/types/pagination.types';
 export type HrAttendanceRow = {
   employee: {
     id: string;
@@ -23,7 +25,9 @@ export type HrAttendanceData = {
   date: string;
   attendance: HrAttendanceRow[];
   summary: { total: number; present: number; absent: number; late: number; overtime: number };
+  pagination: PaginationMeta;
 };
 export const hrAttendanceServer = {
-  list: (date: string) => apiRequest<HrAttendanceData>(`/api/hr/attendance?date=${date}`),
+  list: (params: ListParams) =>
+    apiRequest<HrAttendanceData>(`/api/hr/attendance${listQuery(params)}`),
 };

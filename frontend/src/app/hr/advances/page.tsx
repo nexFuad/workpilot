@@ -1,12 +1,14 @@
 'use client';
-import { Check, HandCoins, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Check, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
-import { useHrAdvances } from '@/hooks/use-hr-advances';
-const money = new Intl.NumberFormat('en-BD', {
+import { useSearchBar } from '@/hooks/use-search-bar';
+import { hrAdvancesServer } from '@/server/hr-advances.server';
+const money = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'BDT',
+  currency: 'USD',
   maximumFractionDigits: 0,
 });
 const badge: Record<string, string> = {
@@ -15,12 +17,21 @@ const badge: Record<string, string> = {
   rejected: 'bg-rose-100 text-rose-700',
 };
 export default function AdvancesPage() {
-  const api = useHrAdvances();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const items =
-    api.requests.data?.requests.filter((x) => filter === 'all' || x.status === filter) ?? [];
-  const visible = items.slice((page - 1) * 10, page * 10);
+  const requests = useSearchBar({
+    queryKey: ['hr', 'advances', { status: filter, page, limit: 10 }],
+    queryFn: (search) => hrAdvancesServer.list({ status: filter, page, limit: 10, search }),
+  });
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'approved' | 'rejected' }) =>
+      hrAdvancesServer.review(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hr', 'advances'] }),
+  });
+  const api = { requests, review: reviewMutation };
+  const items = api.requests.data?.requests ?? [];
+  const pagination = api.requests.data?.pagination;
   const review = async (id: string, status: 'approved' | 'rejected') => {
     try {
       await api.review.mutateAsync({ id, status });
@@ -35,34 +46,54 @@ export default function AdvancesPage() {
         <p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-600">
           HR workspace
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-800">Salary advances</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold text-slate-800">Salary advances</h1>
+          {api.requests.isLoading ? (
+            <span className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
+          ) : (
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+              {pagination?.total ?? 0} request(s)
+            </span>
+          )}
+        </div>
         <p className="mt-2 text-sm text-slate-600">
           Review employee requests and approve or reject advance payments.
         </p>
       </div>
-      <div className="flex flex-wrap justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <HandCoins className="size-5 text-emerald-600" />
-          {items.length} request(s)
-        </span>
-        <div className="flex gap-2">
-          {['all', 'pending', 'approved', 'rejected'].map((x) => (
-            <button
-              key={x}
-              onClick={() => {
-                setFilter(x);
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <label className="relative block w-full lg:max-w-md">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={api.requests.searchTerm}
+              onChange={(event) => {
+                api.requests.setSearchTerm(event.target.value);
                 setPage(1);
               }}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter === x ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}
-            >
-              {x}
-            </button>
-          ))}
+              placeholder="Search employee, reason or month..."
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {['all', 'pending', 'approved', 'rejected'].map((x) => (
+              <button
+                key={x}
+                onClick={() => {
+                  setFilter(x);
+                  setPage(1);
+                }}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter === x ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                {x}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="h-[70vh] overflow-auto">
-          <table className="w-full min-w-[950px] text-left text-sm">
+          <table className="w-full min-w-237.5 text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3">Employee</th>
@@ -85,7 +116,7 @@ export default function AdvancesPage() {
                       ))}
                     </tr>
                   ))
-                : visible.map((x) => (
+                : items.map((x) => (
                     <tr key={x.id}>
                       <td className="px-5 py-4">
                         <p className="font-semibold text-slate-800">
@@ -140,7 +171,12 @@ export default function AdvancesPage() {
           </table>
         </div>
         <div className="border-t border-slate-100 px-5 py-4">
-          <Pagination page={page} totalItems={items.length} pageSize={10} onPageChange={setPage} />
+          <Pagination
+            page={pagination?.page ?? page}
+            totalItems={pagination?.total ?? 0}
+            pageSize={10}
+            onPageChange={setPage}
+          />
         </div>
       </section>
     </section>
