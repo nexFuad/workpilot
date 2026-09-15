@@ -12,4 +12,6 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
 });
 
-export const env = schema.parse(process.env);
+const runtimeEnv = (globalThis as { process: { env: Record<string, string | undefined> } }).process.env;
+
+export const env = schema.parse(runtimeEnv);

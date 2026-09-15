@@ -10,4 +10,5 @@ const schema = z.object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().positive().default(4000),
 });
-export const env = schema.parse(process.env);
+const runtimeEnv = globalThis.process.env;
+export const env = schema.parse(runtimeEnv);

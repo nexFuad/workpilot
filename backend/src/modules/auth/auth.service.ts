@@ -1,5 +1,4 @@
 import { compare } from 'bcryptjs';
-import { randomUUID } from 'node:crypto';
 import { type AuthRole, type TokenPayload, signToken, verifyToken } from '../../lib/jwt.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -45,7 +44,7 @@ export async function authenticateUser(employeeId: string, companyName: string, 
 }
 
 async function createTokenPair(user: PublicUser, rememberMe: boolean) {
-  const sessionId = randomUUID();
+  const sessionId = globalThis.crypto.randomUUID();
   const refreshDays = rememberMe ? 30 : 1;
   const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
   await prisma.refreshSession.create({
