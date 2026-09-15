@@ -54,8 +54,17 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
   }
   if (isLoading || !user || user.role !== 'employee')
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">
-        Loading your workspace…
+      <main
+        className="min-h-screen animate-pulse bg-slate-50 p-4 sm:p-6 lg:p-8"
+        aria-label="Loading workspace"
+      >
+        <span className="block h-8 w-56 rounded bg-slate-200" />
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <span key={index} className="h-32 rounded-2xl bg-white shadow-sm" />
+          ))}
+        </div>
+        <div className="mt-6 h-96 rounded-2xl bg-white shadow-sm" />
       </main>
     );
   const mobileLinks = links.slice(0, 3);

@@ -1,6 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BellRing,
   CalendarDays,
@@ -11,6 +12,7 @@ import {
   PencilLine,
   Pin,
   Plus,
+  Search,
   Send,
   Sparkles,
   Trash2,
@@ -19,7 +21,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useHrAnnouncements } from '@/hooks/use-hr-announcements';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { hrAnnouncementsServer } from '@/server/hr-announcements.server';
 import type {
   AnnouncementPriority,
   HrAnnouncement,
@@ -109,7 +112,31 @@ function AnnouncementSkeleton() {
 }
 
 export default function AnnouncementsPage() {
-  const api = useHrAnnouncements();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const announcements = useInfiniteQuery({
+    queryKey: ['hr', 'announcements', debouncedSearch],
+    queryFn: ({ pageParam }) => hrAnnouncementsServer.list(pageParam, 6, debouncedSearch),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
+  });
+  const refreshAnnouncements = () =>
+    queryClient.invalidateQueries({ queryKey: ['hr', 'announcements'] });
+  const create = useMutation({
+    mutationFn: hrAnnouncementsServer.create,
+    onSuccess: refreshAnnouncements,
+  });
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: HrAnnouncementInput }) =>
+      hrAnnouncementsServer.update(id, input),
+    onSuccess: refreshAnnouncements,
+  });
+  const removeAnnouncement = useMutation({
+    mutationFn: hrAnnouncementsServer.remove,
+    onSuccess: refreshAnnouncements,
+  });
+  const api = { announcements, create, update, remove: removeAnnouncement };
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<HrAnnouncement | null>(null);
@@ -244,11 +271,28 @@ export default function AnnouncementsPage() {
               <Icon className="size-5" />
             </span>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{value}</p>
+              {api.announcements.isPending ? (
+                <span className="block h-7 w-14 animate-pulse rounded bg-slate-100" />
+              ) : (
+                <p className="text-2xl font-bold text-slate-800">{value}</p>
+              )}
               <p className="text-xs font-medium text-slate-500">{label}</p>
             </div>
           </article>
         ))}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="relative block w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search announcement title or content..."
+            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+          />
+        </label>
       </div>
 
       {api.announcements.isPending ? (
@@ -273,7 +317,7 @@ export default function AnnouncementsPage() {
           {items.map((item) => (
             <article
               key={item.id}
-              className="group h-[285px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="group h-71.25 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <div
                 className={`h-1 ${item.priority === 'urgent' ? 'bg-rose-500' : item.priority === 'important' ? 'bg-amber-400' : 'bg-emerald-500'}`}
@@ -380,10 +424,7 @@ export default function AnnouncementsPage() {
 
       <div ref={loadMoreRef} className="flex min-h-10 items-center justify-center">
         {api.announcements.isFetchingNextPage ? (
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <LoaderCircle className="size-4 animate-spin text-emerald-600" />
-            Loading more announcements...
-          </span>
+          <span className="h-10 w-full max-w-md animate-pulse rounded-xl bg-slate-100" />
         ) : items.length > 0 && !api.announcements.hasNextPage ? (
           <span className="text-xs font-semibold text-slate-400">All announcements loaded</span>
         ) : null}

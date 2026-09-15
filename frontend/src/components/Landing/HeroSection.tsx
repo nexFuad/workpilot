@@ -4,7 +4,7 @@ export function HeroSection() {
   return (
     <section
       id="home"
-      className="scroll-mt-20 overflow-hidden bg-gradient-to-b from-indigo-50 via-white to-white"
+      className="scroll-mt-20 overflow-hidden bg-linear-to-b from-indigo-50 via-white to-white"
     >
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-18 sm:px-6 md:py-24 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-8">
         <div>

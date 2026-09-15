@@ -1,17 +1,27 @@
 'use client';
-import { FileImage, FileText, LoaderCircle, Upload, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FileImage, FileText, LoaderCircle, Search, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
 import { useCloudinaryUpload } from '@/hooks/use-cloudinary-upload';
-import { useDocuments } from '@/hooks/use-documents';
+import { useSearchBar } from '@/hooks/use-search-bar';
+import { documentsServer } from '@/server/documents.server';
 
 const formatSize = (size: number) =>
   `${(size / 1024 / 1024).toFixed(size < 1024 * 1024 ? 1 : 0)} MB`;
 export default function DocumentsPage() {
+  const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const { documents, create } = useDocuments();
+  const documents = useSearchBar({
+    queryKey: ['documents'],
+    queryFn: documentsServer.list,
+  });
+  const create = useMutation({
+    mutationFn: documentsServer.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents'] }),
+  });
   const { uploadFile, isUploading } = useCloudinaryUpload();
   const submit = async () => {
     if (!file) return;
@@ -90,17 +100,48 @@ export default function DocumentsPage() {
           )}
         </div>
       </section>
+      <div>
+        <label className="relative block w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
+          <input
+            type="search"
+            value={documents.searchTerm}
+            onChange={(event) => documents.setSearchTerm(event.target.value)}
+            placeholder="Search document name, type or status..."
+            className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+          />
+        </label>
+        {documents.isFetching && !documents.isLoading ? (
+          <p className="mt-2 text-xs font-medium text-slate-500">Searching documents…</p>
+        ) : null}
+      </div>
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-5">
           <h2 className="font-bold text-slate-800">Uploaded documents</h2>
-          <p className="mt-1 text-sm text-slate-500">HR/Admin can review each uploaded document.</p>
+          <p className="mt-1 text-sm text-slate-500">HR can review each uploaded document.</p>
         </div>
         <div className="divide-y divide-slate-100">
           {documents.isLoading ? (
-            <p className="p-6 text-sm text-slate-500">Loading documents…</p>
+            Array.from({ length: 5 }, (_, index) => (
+              <div
+                key={index}
+                className="flex animate-pulse items-center justify-between gap-4 p-5"
+              >
+                <div className="flex flex-1 items-center gap-3">
+                  <span className="size-10 rounded-xl bg-slate-100" />
+                  <div className="flex-1 space-y-2">
+                    <span className="block h-4 w-1/3 rounded bg-slate-100" />
+                    <span className="block h-3 w-1/2 rounded bg-slate-100" />
+                  </div>
+                </div>
+                <span className="h-6 w-20 rounded-full bg-slate-100" />
+              </div>
+            ))
           ) : (documents.data?.documents.length ?? 0) === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500">
-              You have not uploaded any documents yet.
+              {documents.debouncedSearch
+                ? 'No document matched your search.'
+                : 'You have not uploaded any documents yet.'}
             </p>
           ) : (
             documents.data?.documents.map((document) => (

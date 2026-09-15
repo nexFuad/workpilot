@@ -1,6 +1,8 @@
 import { getCookie } from 'hono/cookie';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
+import { getListQuery, pagination } from '../../lib/list-query.js';
 import { prisma } from '../../lib/prisma.js';
 import { getCurrentUser } from '../auth/auth.service.js';
 
@@ -21,7 +23,7 @@ const taskSchema = z.object({
 async function authorizeHr(c: Context) {
   try {
     const user = await getCurrentUser(getCookie(c, 'workpilot_access') ?? '');
-    return ['hr', 'admin'].includes(user.role) ? user : null;
+    return user.role === 'hr' ? user : null;
   } catch {
     return null;
   }
@@ -49,23 +51,65 @@ export const hrTasksRoutes = new Hono()
   .get('/', async (c) => {
     if (!(await authorizeHr(c))) return c.json({ message: 'Unauthorized.' }, 403);
 
-    const [tasks, employees] = await Promise.all([
+    const query = getListQuery(c);
+    const status = ['todo', 'in_progress', 'completed'].includes(query.status ?? '')
+      ? query.status
+      : undefined;
+    const where: Prisma.TaskWhereInput = {
+      ...(status ? { status } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' } },
+              { description: { contains: query.search, mode: 'insensitive' } },
+              {
+                user: {
+                  is: {
+                    OR: [
+                      { employeeId: { contains: query.search, mode: 'insensitive' } },
+                      { fullName: { contains: query.search, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [tasks, total, employees, grouped] = await Promise.all([
       prisma.task.findMany({
+        where,
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+        skip: query.skip,
+        take: query.limit,
         include: {
           user: {
             select: { id: true, employeeId: true, fullName: true, profileImage: true },
           },
         },
       }),
+      prisma.task.count({ where }),
       prisma.user.findMany({
         where: { role: 'employee', isActive: true },
         orderBy: [{ fullName: 'asc' }, { employeeId: 'asc' }],
         select: { id: true, employeeId: true, fullName: true },
       }),
+      prisma.task.groupBy({ by: ['status'], _count: { _all: true } }),
     ]);
 
-    return c.json({ tasks, employees });
+    const counts = Object.fromEntries(grouped.map((item) => [item.status, item._count._all]));
+    return c.json({
+      tasks,
+      employees,
+      pagination: pagination(total, query.page, query.limit),
+      summary: {
+        total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        todo: counts.todo ?? 0,
+        inProgress: counts.in_progress ?? 0,
+        completed: counts.completed ?? 0,
+      },
+    });
   })
   .post('/', async (c) => {
     if (!(await authorizeHr(c))) return c.json({ message: 'Unauthorized.' }, 403);

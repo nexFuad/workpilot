@@ -18,12 +18,16 @@ import { hrAdvancesRoutes } from './modules/hr/hr-advances.routes.js';
 import { hrLoansRoutes } from './modules/hr/hr-loans.routes.js';
 import { hrAnnouncementsRoutes } from './modules/hr/hr-announcements.routes.js';
 import { hrTasksRoutes } from './modules/hr/hr-tasks.routes.js';
+import { hrProjectsRoutes } from './modules/hr/hr-projects.routes.js';
+import { hrEmployeesRoutes } from './modules/hr/hr-employees.routes.js';
 export const app = new Hono();
+const allowedOrigins = env.NODE_ENV === 'production' ? [env.FRONTEND_URL] : [env.FRONTEND_URL, 'http://localhost:3000'];
 app.use('*', cors({
-    origin: [env.FRONTEND_URL, 'http://localhost:3000'],
+    origin: allowedOrigins,
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    maxAge: 86_400,
 }));
 app.get('/', (c) => c.json({ name: 'WorkPilot API', status: 'ok' }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
@@ -44,3 +48,5 @@ app.route('/api/hr/advances', hrAdvancesRoutes);
 app.route('/api/hr/loans', hrLoansRoutes);
 app.route('/api/hr/announcements', hrAnnouncementsRoutes);
 app.route('/api/hr/tasks', hrTasksRoutes);
+app.route('/api/hr/projects', hrProjectsRoutes);
+app.route('/api/hr/employees', hrEmployeesRoutes);

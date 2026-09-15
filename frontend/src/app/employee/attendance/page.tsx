@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera, Clock3, History, ImagePlus, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -9,7 +10,6 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
 import { SoftSelect } from '@/components/ui/SoftSelect';
-import { useAttendance } from '@/hooks/use-attendance';
 import { useCloudinaryUpload } from '@/hooks/use-cloudinary-upload';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { attendanceServer } from '@/server/attendance.server';
@@ -85,6 +85,7 @@ function HistoryCard({ attendance }: { attendance: Attendance }) {
 }
 
 export default function AttendancePage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<'current' | 'history'>('current');
   const [actionOpen, setActionOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -93,7 +94,27 @@ export default function AttendancePage() {
   const [visibleCount, setVisibleCount] = useState(8);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { options, current, checkIn, checkOut } = useAttendance();
+  const options = useQuery({
+    queryKey: ['attendance', 'options'],
+    queryFn: attendanceServer.options,
+  });
+  const current = useQuery({
+    queryKey: ['attendance', 'current'],
+    queryFn: attendanceServer.current,
+  });
+  const refreshAttendance = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'current'] }),
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'history'] }),
+    ]);
+  const checkIn = useMutation({
+    mutationFn: attendanceServer.checkIn,
+    onSuccess: refreshAttendance,
+  });
+  const checkOut = useMutation({
+    mutationFn: attendanceServer.checkOut,
+    onSuccess: refreshAttendance,
+  });
   const { uploadImage, isUploading } = useCloudinaryUpload();
   const attendanceSearch = useSearchBar({
     queryKey: ['attendance', 'history'],
@@ -225,14 +246,21 @@ export default function AttendancePage() {
         title="My Attendance"
         description="Check in, check out, and review your attendance history."
         action={
-          <div className="h-fit rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">
-              Current status
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-700">
-              {active ? 'Ready to check out' : 'Ready to check in'}
-            </p>
-          </div>
+          current.isLoading ? (
+            <div className="h-16 w-44 animate-pulse rounded-2xl border border-sky-100 bg-white p-3">
+              <span className="block h-3 w-24 rounded bg-slate-100" />
+              <span className="mt-2 block h-4 w-32 rounded bg-slate-100" />
+            </div>
+          ) : (
+            <div className="h-fit rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 sm:text-right">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">
+                Current status
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">
+                {active ? 'Ready to check out' : 'Ready to check in'}
+              </p>
+            </div>
+          )
         }
       />
       <div className="mb-6 mt-7 flex w-fit rounded-xl bg-sky-50 p-1">
@@ -254,7 +282,17 @@ export default function AttendancePage() {
 
       {tab === 'current' ? (
         <div className="w-full rounded-3xl border border-sky-100 bg-white p-6 shadow-sm sm:p-8">
-          {active ? (
+          {current.isLoading ? (
+            <div className="grid animate-pulse gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+              <span className="size-18 rounded-xl bg-slate-100" />
+              <div className="space-y-3">
+                <span className="block h-6 w-24 rounded-full bg-slate-100" />
+                <span className="block h-7 w-72 max-w-full rounded bg-slate-100" />
+                <span className="block h-20 w-full rounded-xl bg-slate-100" />
+              </div>
+              <span className="h-12 w-28 rounded-xl bg-slate-100" />
+            </div>
+          ) : active ? (
             <div className="grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
               <span
                 style={{ backgroundImage: `url(${active.checkInPhotoUrl})` }}
@@ -338,6 +376,20 @@ export default function AttendancePage() {
             )}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
+            {attendanceSearch.isLoading &&
+              Array.from({ length: 6 }, (_, index) => (
+                <article
+                  key={index}
+                  className="animate-pulse rounded-2xl border border-sky-100 bg-white p-5 shadow-sm"
+                >
+                  <div className="flex justify-between gap-4">
+                    <span className="block h-5 w-32 rounded bg-slate-100" />
+                    <span className="block h-6 w-20 rounded-full bg-slate-100" />
+                  </div>
+                  <span className="mt-5 block h-16 w-full rounded-xl bg-slate-100" />
+                  <span className="mt-4 block h-4 w-2/3 rounded bg-slate-100" />
+                </article>
+              ))}
             {records.slice(0, visibleCount).map((attendance) => (
               <HistoryCard key={attendance.id} attendance={attendance} />
             ))}

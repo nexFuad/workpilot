@@ -1,6 +1,8 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   CheckCircle2,
@@ -8,6 +10,7 @@ import {
   ClipboardCheck,
   Clock3,
   LoaderCircle,
+  MoreHorizontal,
   PencilLine,
   Plus,
   Search,
@@ -18,7 +21,9 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
-import { useHrTasks } from '@/hooks/use-hr-tasks';
+import { SoftSelect } from '@/components/ui/SoftSelect';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { hrTasksServer } from '@/server/hr-tasks.server';
 import type { HrTask, HrTaskInput, TaskPriority } from '@/types/hr-task.types';
 import type { TaskStatus } from '@/types/task.types';
 
@@ -80,7 +85,7 @@ function isOverdue(task: HrTask) {
 }
 
 export default function HrTasksPage() {
-  const api = useHrTasks();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<'all' | TaskStatus>('all');
   const [search, setSearch] = useState('');
@@ -88,21 +93,32 @@ export default function HrTasksPage() {
   const [editing, setEditing] = useState<HrTask | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<HrTask | null>(null);
   const [form, setForm] = useState<HrTaskInput>(emptyForm);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const params = { search: debouncedSearch, status, page, limit: 10 };
+  const tasksQuery = useQuery({
+    queryKey: ['hr', 'tasks', params],
+    queryFn: () => hrTasksServer.list(params),
+  });
+  const refreshTasks = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['hr', 'tasks'] }),
+      queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    ]);
+  };
+  const create = useMutation({ mutationFn: hrTasksServer.create, onSuccess: refreshTasks });
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: HrTaskInput }) =>
+      hrTasksServer.update(id, input),
+    onSuccess: refreshTasks,
+  });
+  const removeTask = useMutation({ mutationFn: hrTasksServer.remove, onSuccess: refreshTasks });
+  const api = { tasks: tasksQuery, create, update, remove: removeTask };
 
   const tasks = api.tasks.data?.tasks ?? [];
   const employees = api.tasks.data?.employees ?? [];
-  const query = search.trim().toLowerCase();
-  const filtered = tasks.filter((task) => {
-    const matchesStatus = status === 'all' || task.status === status;
-    const matchesSearch =
-      !query ||
-      task.title.toLowerCase().includes(query) ||
-      task.user.employeeId.toLowerCase().includes(query) ||
-      (task.user.fullName ?? '').toLowerCase().includes(query);
-    return matchesStatus && matchesSearch;
-  });
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / 10)));
-  const visible = filtered.slice((currentPage - 1) * 10, currentPage * 10);
+  const summary = api.tasks.data?.summary;
+  const pagination = api.tasks.data?.pagination;
+  const currentPage = pagination?.page ?? page;
 
   const openCreate = () => {
     setEditing(null);
@@ -183,20 +199,20 @@ export default function HrTasksPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Total tasks', value: tasks.length, icon: ClipboardCheck },
+          { label: 'Total tasks', value: summary?.total ?? 0, icon: ClipboardCheck },
           {
             label: 'To do',
-            value: tasks.filter((task) => task.status === 'todo').length,
+            value: summary?.todo ?? 0,
             icon: CircleDot,
           },
           {
             label: 'In progress',
-            value: tasks.filter((task) => task.status === 'in_progress').length,
+            value: summary?.inProgress ?? 0,
             icon: Clock3,
           },
           {
             label: 'Completed',
-            value: tasks.filter((task) => task.status === 'completed').length,
+            value: summary?.completed ?? 0,
             icon: CheckCircle2,
           },
         ].map(({ label, value, icon: Icon }) => (
@@ -208,7 +224,11 @@ export default function HrTasksPage() {
               <Icon className="size-5" />
             </span>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{value}</p>
+              {api.tasks.isLoading ? (
+                <span className="block h-7 w-16 animate-pulse rounded bg-slate-100" />
+              ) : (
+                <p className="text-2xl font-bold text-slate-800">{value}</p>
+              )}
               <p className="text-xs font-medium text-slate-500">{label}</p>
             </div>
           </article>
@@ -247,7 +267,7 @@ export default function HrTasksPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="h-[70vh] overflow-auto">
-          <table className="w-full min-w-[1050px] text-left text-sm">
+          <table className="w-full min-w-162.5 text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3">Employee</th>
@@ -275,8 +295,8 @@ export default function HrTasksPage() {
                     Tasks could not be loaded.
                   </td>
                 </tr>
-              ) : visible.length ? (
-                visible.map((task) => (
+              ) : tasks.length ? (
+                tasks.map((task) => (
                   <tr key={task.id} className="transition hover:bg-slate-50/70">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -313,38 +333,54 @@ export default function HrTasksPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <select
+                      <SoftSelect
                         value={task.status}
                         disabled={api.update.isPending}
-                        onChange={(event) =>
-                          void changeStatus(task, event.target.value as TaskStatus)
-                        }
-                        className={`rounded-lg border-0 px-2.5 py-2 text-xs font-bold outline-none ${statusStyle[task.status]}`}
-                      >
-                        {(['todo', 'in_progress', 'completed'] as TaskStatus[]).map((item) => (
-                          <option key={item} value={item}>
-                            {statusLabel[item]}
-                          </option>
-                        ))}
-                      </select>
+                        onValueChange={(value) => void changeStatus(task, value as TaskStatus)}
+                        placeholder="Select status"
+                        tone="emerald"
+                        compact
+                        triggerClassName={`border-transparent ${statusStyle[task.status]}`}
+                        options={(['todo', 'in_progress', 'completed'] as TaskStatus[]).map(
+                          (item) => ({ value: item, label: statusLabel[item] }),
+                        )}
+                      />
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(task)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
-                        >
-                          <PencilLine className="size-3.5" /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(task)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-bold text-rose-600 hover:bg-rose-100"
-                        >
-                          <Trash2 className="size-3.5" /> Delete
-                        </button>
-                      </div>
+                      <DropdownMenu.Root>
+                        <div className="flex justify-end">
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Open actions for ${task.title}`}
+                              className="grid size-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 data-[state=open]:border-emerald-200 data-[state=open]:bg-emerald-50 data-[state=open]:text-emerald-700"
+                            >
+                              <MoreHorizontal className="size-5" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                        </div>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content
+                            align="end"
+                            sideOffset={6}
+                            className="z-50 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-200/70"
+                          >
+                            <DropdownMenu.Item
+                              onSelect={() => openEdit(task)}
+                              className="flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-600 outline-none data-highlighted:bg-emerald-50 data-highlighted:text-emerald-700"
+                            >
+                              <PencilLine className="size-4" /> Edit task
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
+                            <DropdownMenu.Item
+                              onSelect={() => setDeleteTarget(task)}
+                              className="flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-rose-600 outline-none data-highlighted:bg-rose-50"
+                            >
+                              <Trash2 className="size-4" /> Delete task
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
                     </td>
                   </tr>
                 ))
@@ -361,7 +397,7 @@ export default function HrTasksPage() {
         <div className="border-t border-slate-100 px-5 py-4">
           <Pagination
             page={currentPage}
-            totalItems={filtered.length}
+            totalItems={pagination?.total ?? 0}
             pageSize={10}
             onPageChange={setPage}
           />
@@ -389,19 +425,16 @@ export default function HrTasksPage() {
             <form onSubmit={save} className="mt-6 grid gap-5 sm:grid-cols-2">
               <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
                 Assign to employee
-                <select
-                  required
-                  value={form.userId}
-                  onChange={(event) => setForm({ ...form, userId: event.target.value })}
-                  className={fieldClass}
-                >
-                  <option value="">Select an employee</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.fullName || employee.employeeId} · {employee.employeeId}
-                    </option>
-                  ))}
-                </select>
+                <SoftSelect
+                  value={form.userId || undefined}
+                  onValueChange={(value) => setForm({ ...form, userId: value })}
+                  placeholder="Select an employee"
+                  tone="emerald"
+                  options={employees.map((employee) => ({
+                    value: employee.id,
+                    label: `${employee.fullName || employee.employeeId} · ${employee.employeeId}`,
+                  }))}
+                />
               </label>
 
               <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
@@ -431,17 +464,17 @@ export default function HrTasksPage() {
 
               <label className="block text-sm font-bold text-slate-700">
                 Priority
-                <select
+                <SoftSelect
                   value={form.priority}
-                  onChange={(event) =>
-                    setForm({ ...form, priority: event.target.value as TaskPriority })
-                  }
-                  className={fieldClass}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
+                  onValueChange={(value) => setForm({ ...form, priority: value as TaskPriority })}
+                  placeholder="Select priority"
+                  tone="emerald"
+                  options={[
+                    { value: 'low', label: 'Low priority' },
+                    { value: 'medium', label: 'Medium priority' },
+                    { value: 'high', label: 'High priority' },
+                  ]}
+                />
               </label>
 
               <label className="block text-sm font-bold text-slate-700">
@@ -456,17 +489,17 @@ export default function HrTasksPage() {
 
               <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
                 Task status
-                <select
+                <SoftSelect
                   value={form.status}
-                  onChange={(event) =>
-                    setForm({ ...form, status: event.target.value as TaskStatus })
-                  }
-                  className={fieldClass}
-                >
-                  <option value="todo">To do</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="completed">Completed</option>
-                </select>
+                  onValueChange={(value) => setForm({ ...form, status: value as TaskStatus })}
+                  placeholder="Select task status"
+                  tone="emerald"
+                  options={[
+                    { value: 'todo', label: 'To do' },
+                    { value: 'in_progress', label: 'In progress' },
+                    { value: 'completed', label: 'Completed' },
+                  ]}
+                />
               </label>
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:col-span-2 sm:flex-row sm:justify-end">

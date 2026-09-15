@@ -1,6 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarDays,
   CheckCircle2,
@@ -13,10 +14,10 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
-import { useCompensation } from '@/hooks/use-compensation';
+import { compensationServer } from '@/server/compensation.server';
 
 type SalaryRecord = {
   month: string;
@@ -37,70 +38,13 @@ type AdvanceRequest = {
   settlementMonth: string;
   status: 'Pending' | 'Approved' | 'Rejected';
 };
-const salaryRecords: SalaryRecord[] = [
-  {
-    month: 'September 2026',
-    period: '1–30 September 2026',
-    paidOn: '30 September 2026',
-    basic: 48000,
-    allowances: 7000,
-    bonus: 2500,
-    tax: 4100,
-    providentFund: 2400,
-    status: 'Upcoming',
-  },
-  {
-    month: 'August 2026',
-    period: '1–31 August 2026',
-    paidOn: '31 August 2026',
-    basic: 48000,
-    allowances: 7000,
-    bonus: 0,
-    tax: 3900,
-    providentFund: 2400,
-    status: 'Paid',
-  },
-  {
-    month: 'July 2026',
-    period: '1–31 July 2026',
-    paidOn: '31 July 2026',
-    basic: 48000,
-    allowances: 7000,
-    bonus: 1500,
-    tax: 4000,
-    providentFund: 2400,
-    status: 'Paid',
-  },
-  {
-    month: 'June 2026',
-    period: '1–30 June 2026',
-    paidOn: '30 June 2026',
-    basic: 48000,
-    allowances: 7000,
-    bonus: 0,
-    tax: 3900,
-    providentFund: 2400,
-    status: 'Paid',
-  },
-];
-const currency = new Intl.NumberFormat('en-BD', {
+const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'BDT',
+  currency: 'USD',
   maximumFractionDigits: 0,
 });
 const takeHome = (record: SalaryRecord) =>
   record.basic + record.allowances + record.bonus - record.tax - record.providentFund;
-
-const initialAdvances: AdvanceRequest[] = [
-  {
-    id: '1',
-    amount: 5000,
-    reason: 'Urgent medical expense',
-    requestedOn: '08 September 2026',
-    settlementMonth: 'September 2026',
-    status: 'Approved',
-  },
-];
 
 function DetailRow({
   label,
@@ -123,20 +67,29 @@ function DetailRow({
 }
 
 export default function SalaryPage() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'salary' | 'advance'>('salary');
-  const [selectedMonth, setSelectedMonth] = useState(salaryRecords[0].month);
+  const [selectedMonth, setSelectedMonth] = useState('');
   const [payslipOpen, setPayslipOpen] = useState(false);
   const [advanceOpen, setAdvanceOpen] = useState(false);
-  const [advances, setAdvances] = useState<AdvanceRequest[]>(initialAdvances);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceReason, setAdvanceReason] = useState('');
-  const { salary, createAdvance } = useCompensation();
+  const salary = useQuery({
+    queryKey: ['compensation', 'salary', selectedMonth],
+    queryFn: () => compensationServer.salary(selectedMonth),
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  });
+  const createAdvance = useMutation({
+    mutationFn: compensationServer.createAdvance,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['compensation'] }),
+  });
   const records: SalaryRecord[] =
     salary.data?.payments.map((payment) => ({
       ...payment,
       status: payment.status === 'paid' ? 'Paid' : 'Upcoming',
       paidOn: payment.paidOn ?? null,
-    })) ?? salaryRecords;
+    })) ?? [];
   const advanceItems: AdvanceRequest[] =
     salary.data?.advances.map((advance) => ({
       ...advance,
@@ -145,20 +98,61 @@ export default function SalaryPage() {
       ),
       status: (advance.status[0].toUpperCase() +
         advance.status.slice(1)) as AdvanceRequest['status'],
-    })) ?? advances;
-  const activeLoanInstallment =
-    salary.data?.loans.reduce((total, loan) => total + loan.installment, 0) ?? 5000;
-  const selected = useMemo(
-    () => records.find((record) => record.month === selectedMonth) ?? records[0],
-    [records, selectedMonth],
-  );
+    })) ?? [];
+  const activeLoanInstallment = salary.data?.activeLoanInstallment ?? 0;
+  const selected = salary.data?.selectedPayment
+    ? ({
+        ...salary.data.selectedPayment,
+        status: salary.data.selectedPayment.status === 'paid' ? 'Paid' : 'Upcoming',
+      } as SalaryRecord)
+    : undefined;
+  if (salary.isLoading) {
+    return (
+      <section className="w-full space-y-6 pb-8">
+        <EmployeeHeader
+          title="Salary & payslips"
+          description="Track your monthly earnings, deductions, and payment history."
+        />
+        <div className="grid animate-pulse gap-4 sm:grid-cols-3">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className="h-32 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <span className="block h-4 w-32 rounded bg-slate-100" />
+              <span className="mt-7 block h-7 w-40 rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+        <div className="grid animate-pulse gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="h-96 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="block h-5 w-48 rounded bg-slate-100" />
+            <span className="mt-6 block h-72 w-full rounded-xl bg-slate-100" />
+          </div>
+          <div className="h-96 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="block h-5 w-36 rounded bg-slate-100" />
+            <span className="mt-6 block h-64 w-full rounded-xl bg-slate-100" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (!selected) {
+    return (
+      <section className="w-full space-y-6 pb-8">
+        <EmployeeHeader
+          title="Salary & payslips"
+          description="Track your monthly earnings, deductions, and payment history."
+        />
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">
+          No payroll record is available for your account yet.
+        </div>
+      </section>
+    );
+  }
   const grossPay = selected.basic + selected.allowances + selected.bonus;
   const deductions = selected.tax + selected.providentFund;
-  const approvedAdvance = advanceItems
-    .filter(
-      (advance) => advance.status === 'Approved' && advance.settlementMonth === selected.month,
-    )
-    .reduce((total, advance) => total + advance.amount, 0);
+  const approvedAdvance = salary.data?.approvedAdvanceAmount ?? 0;
   const finalPayable = takeHome(selected) - approvedAdvance - activeLoanInstallment;
   const isUpcoming = selected.status === 'Upcoming';
   const openPayslip = () => {
@@ -169,7 +163,7 @@ export default function SalaryPage() {
   const submitAdvance = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = Number(advanceAmount);
-    if (!amount || amount < 1000) return toast.error('Enter an advance amount of at least ৳1,000.');
+    if (!amount || amount < 1000) return toast.error('Enter an advance amount of at least $1,000.');
     if (amount > takeHome(selected))
       return toast.error('Advance amount cannot exceed your net salary.');
     if (!advanceReason.trim())
@@ -180,17 +174,6 @@ export default function SalaryPage() {
         reason: advanceReason.trim(),
         settlementMonth: selected.month,
       });
-      setAdvances((current) => [
-        {
-          id: Date.now().toString(),
-          amount,
-          reason: advanceReason.trim(),
-          requestedOn: 'Today',
-          settlementMonth: selected.month,
-          status: 'Pending',
-        },
-        ...current,
-      ]);
       setAdvanceAmount('');
       setAdvanceReason('');
       setAdvanceOpen(false);
@@ -225,7 +208,7 @@ export default function SalaryPage() {
       {activeTab === 'salary' ? (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <article className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-600 to-cyan-500 p-5 text-white shadow-sm shadow-sky-200">
+            <article className="rounded-2xl border border-sky-100 bg-linear-to-br from-sky-600 to-cyan-500 p-5 text-white shadow-sm shadow-sky-200">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-sky-100">Expected take-home</p>
                 <WalletCards className="size-5 text-sky-100" />
@@ -266,7 +249,7 @@ export default function SalaryPage() {
                 <label className="relative block">
                   <span className="sr-only">Select salary month</span>
                   <select
-                    value={selectedMonth}
+                    value={selectedMonth || selected.month}
                     onChange={(event) => setSelectedMonth(event.target.value)}
                     className="appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-3 pr-9 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
                   >

@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -9,8 +10,8 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
 import { useAuth } from '@/hooks/use-auth';
-import { useLeave } from '@/hooks/use-leave';
-import { useSearchBar } from '@/hooks/use-search-bar';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { leaveServer } from '@/server/leave.server';
 import type { LeaveRequest, LeaveRequestInput } from '@/types/leave.types';
 
 const schema = z
@@ -35,13 +36,26 @@ const formatDay = (date: string) =>
   new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(date));
 
 export default function LeavePage() {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<LeaveRequest | null>(null);
   const [deleting, setDeleting] = useState<LeaveRequest | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
-  const search = useSearchBar({ queryKey: ['leave', 'search-input'], queryFn: async () => ({}) });
-  const { requests, create, update, remove } = useLeave(search.debouncedSearch);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim());
+  const requests = useQuery({
+    queryKey: ['leave', 'requests', debouncedSearch],
+    queryFn: () => leaveServer.list(debouncedSearch),
+  });
+  const refreshRequests = () => queryClient.invalidateQueries({ queryKey: ['leave', 'requests'] });
+  const create = useMutation({ mutationFn: leaveServer.create, onSuccess: refreshRequests });
+  const update = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: LeaveRequestInput }) =>
+      leaveServer.update(id, data),
+    onSuccess: refreshRequests,
+  });
+  const remove = useMutation({ mutationFn: leaveServer.remove, onSuccess: refreshRequests });
   const {
     handleSubmit,
     reset,
@@ -108,13 +122,33 @@ export default function LeavePage() {
       <div className="relative mt-7 max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
         <input
-          value={search.searchTerm}
-          onChange={(event) => search.setSearchTerm(event.target.value)}
+          value={searchTerm}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            setVisibleCount(6);
+          }}
           placeholder="Search any leave information"
           className="w-full rounded-xl border border-sky-100 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
         />
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
+        {requests.isLoading &&
+          Array.from({ length: 6 }, (_, index) => (
+            <article
+              key={index}
+              className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex justify-between gap-4">
+                <div className="w-full space-y-3">
+                  <span className="block h-4 w-1/3 rounded bg-slate-100" />
+                  <span className="block h-3 w-1/2 rounded bg-slate-100" />
+                </div>
+                <span className="h-6 w-20 rounded-full bg-slate-100" />
+              </div>
+              <span className="mt-5 block h-14 w-full rounded-xl bg-slate-100" />
+              <span className="mt-4 block h-4 w-3/4 rounded bg-slate-100" />
+            </article>
+          ))}
         {requests.data?.requests.slice(0, visibleCount).map((request) => {
           const pending = request.status === 'pending';
           return (

@@ -1,4 +1,5 @@
 import type { TaskStatus } from '@/types/task.types';
+import type { PaginationMeta } from '@/types/pagination.types';
 
 export type TaskPriority = 'low' | 'medium' | 'high';
 
@@ -34,4 +35,6 @@ export type HrTaskInput = {
 export type HrTasksResponse = {
   tasks: HrTask[];
   employees: HrTaskEmployee[];
+  pagination: PaginationMeta;
+  summary: { total: number; todo: number; inProgress: number; completed: number };
 };

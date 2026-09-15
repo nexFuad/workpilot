@@ -13,7 +13,7 @@ const announcementSchema = z.object({
 async function authorizeHr(c) {
     try {
         const user = await getCurrentUser(getCookie(c, 'workpilot_access') ?? '');
-        return ['hr', 'admin'].includes(user.role) ? user : null;
+        return user.role === 'hr' ? user : null;
     }
     catch {
         return null;
@@ -26,15 +26,25 @@ export const hrAnnouncementsRoutes = new Hono()
     const page = Math.max(Number.parseInt(c.req.query('page') ?? '0', 10) || 0, 0);
     const limit = Math.min(Math.max(Number.parseInt(c.req.query('limit') ?? '6', 10) || 6, 1), 20);
     const skip = page * limit;
+    const search = c.req.query('search')?.trim();
+    const where = search
+        ? {
+            OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { content: { contains: search, mode: 'insensitive' } },
+            ],
+        }
+        : {};
     const [items, total, active, pinned] = await Promise.all([
         prisma.announcement.findMany({
+            where,
             orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }],
             skip,
             take: limit,
         }),
-        prisma.announcement.count(),
-        prisma.announcement.count({ where: { isActive: true } }),
-        prisma.announcement.count({ where: { isPinned: true } }),
+        prisma.announcement.count({ where }),
+        prisma.announcement.count({ where: { AND: [where, { isActive: true }] } }),
+        prisma.announcement.count({ where: { AND: [where, { isPinned: true }] } }),
     ]);
     return c.json({
         announcements: items,

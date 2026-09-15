@@ -1,7 +1,7 @@
 const questions = [
   [
     'Can WorkPilot support different user roles?',
-    'Yes. Administrators, HR teams, and employees each receive a focused workspace designed for their responsibilities.',
+    'Yes. HR teams and employees each receive a focused workspace designed for their responsibilities.',
   ],
   [
     'Will it work for a growing team?',

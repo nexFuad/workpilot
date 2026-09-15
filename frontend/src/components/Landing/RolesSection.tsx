@@ -1,11 +1,5 @@
 const roles = [
   {
-    role: 'Administrators',
-    title: 'Keep the whole operation aligned.',
-    text: 'A high-level view of people, access, reports, and organizational health.',
-    tone: 'bg-indigo-50 border-indigo-100 text-indigo-700',
-  },
-  {
     role: 'HR teams',
     title: 'Put people first, without the paperwork.',
     text: 'Manage employee information, attendance, leave, and important HR workflows.',
@@ -28,7 +22,7 @@ export function RolesSection() {
             One platform. A better view for everyone.
           </h2>
         </div>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
+        <div className="mt-10 grid gap-5 md:grid-cols-2">
           {roles.map(({ role, title, text, tone }) => (
             <article className={`rounded-2xl border p-7 ${tone}`} key={role}>
               <p className="text-sm font-semibold">{role}</p>

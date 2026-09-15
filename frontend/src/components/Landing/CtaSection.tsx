@@ -3,7 +3,7 @@ export function CtaSection() {
   return (
     <section className="bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-18 sm:px-6 md:py-24 lg:px-8">
-        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-100 via-violet-50 to-sky-100 px-6 py-12 text-center text-slate-800 sm:px-12">
+        <div className="rounded-3xl border border-indigo-100 bg-linear-to-br from-indigo-100 via-violet-50 to-sky-100 px-6 py-12 text-center text-slate-800 sm:px-12">
           <p className="text-sm font-semibold text-indigo-600">READY WHEN YOU ARE</p>
           <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
             Build a more organized, more human workday.

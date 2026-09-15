@@ -1,5 +1,6 @@
 import { getCookie } from 'hono/cookie';
 import { Hono } from 'hono';
+import { getListQuery, pagination } from '../../lib/list-query.js';
 import { prisma } from '../../lib/prisma.js';
 import { getCurrentUser } from '../auth/auth.service.js';
 import { leaveRequestSchema } from './leave.schema.js';
@@ -16,17 +17,33 @@ export const leaveRoutes = new Hono()
     const user = await currentUser(c);
     if (!user)
         return c.json({ message: 'Unauthorized.' }, 401);
-    const search = c.req.query('search')?.trim().toLowerCase() ?? '';
-    const page = Math.max(Number(c.req.query('page')) || 0, 0);
-    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 6, 1), 20);
-    const requests = await prisma.leaveRequest.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } });
-    const matched = search ? requests.filter((request) => [
-        user.employeeId, request.leaveType, request.reason, request.status,
-        request.startDate.toISOString(), request.endDate.toISOString(),
-        request.startDate.toLocaleDateString('en-US'), request.endDate.toLocaleDateString('en-US'),
-    ].join(' ').toLowerCase().includes(search)) : requests;
-    const start = page * limit;
-    return c.json({ requests: matched.slice(start, start + limit), nextPage: start + limit < matched.length ? page + 1 : null });
+    const query = getListQuery(c, 20);
+    const status = ['pending', 'approved', 'rejected'].includes(query.status ?? '')
+        ? query.status
+        : undefined;
+    const where = {
+        userId: user.id,
+        ...(status ? { status } : {}),
+        ...(query.search
+            ? {
+                OR: [
+                    { leaveType: { contains: query.search, mode: 'insensitive' } },
+                    { reason: { contains: query.search, mode: 'insensitive' } },
+                    { status: { contains: query.search, mode: 'insensitive' } },
+                ],
+            }
+            : {}),
+    };
+    const [requests, total] = await Promise.all([
+        prisma.leaveRequest.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: query.skip,
+            take: query.limit,
+        }),
+        prisma.leaveRequest.count({ where }),
+    ]);
+    return c.json({ requests, pagination: pagination(total, query.page, query.limit) });
 })
     .post('/', async (c) => {
     const user = await currentUser(c);
@@ -35,14 +52,23 @@ export const leaveRoutes = new Hono()
     const parsed = leaveRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
         return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid leave request.' }, 400);
-    const request = await prisma.leaveRequest.create({ data: { ...parsed.data, userId: user.id, startDate: new Date(parsed.data.startDate), endDate: new Date(parsed.data.endDate) } });
+    const request = await prisma.leaveRequest.create({
+        data: {
+            ...parsed.data,
+            userId: user.id,
+            startDate: new Date(parsed.data.startDate),
+            endDate: new Date(parsed.data.endDate),
+        },
+    });
     return c.json({ request }, 201);
 })
     .patch('/:id', async (c) => {
     const user = await currentUser(c);
     if (!user)
         return c.json({ message: 'Unauthorized.' }, 401);
-    const existing = await prisma.leaveRequest.findFirst({ where: { id: c.req.param('id'), userId: user.id } });
+    const existing = await prisma.leaveRequest.findFirst({
+        where: { id: c.req.param('id'), userId: user.id },
+    });
     if (!existing)
         return c.json({ message: 'Leave request not found.' }, 404);
     if (existing.status !== 'pending')
@@ -50,14 +76,23 @@ export const leaveRoutes = new Hono()
     const parsed = leaveRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
         return c.json({ message: parsed.error.issues[0]?.message ?? 'Invalid leave request.' }, 400);
-    const request = await prisma.leaveRequest.update({ where: { id: existing.id }, data: { ...parsed.data, startDate: new Date(parsed.data.startDate), endDate: new Date(parsed.data.endDate) } });
+    const request = await prisma.leaveRequest.update({
+        where: { id: existing.id },
+        data: {
+            ...parsed.data,
+            startDate: new Date(parsed.data.startDate),
+            endDate: new Date(parsed.data.endDate),
+        },
+    });
     return c.json({ request });
 })
     .delete('/:id', async (c) => {
     const user = await currentUser(c);
     if (!user)
         return c.json({ message: 'Unauthorized.' }, 401);
-    const existing = await prisma.leaveRequest.findFirst({ where: { id: c.req.param('id'), userId: user.id } });
+    const existing = await prisma.leaveRequest.findFirst({
+        where: { id: c.req.param('id'), userId: user.id },
+    });
     if (!existing)
         return c.json({ message: 'Leave request not found.' }, 404);
     if (existing.status !== 'pending')
