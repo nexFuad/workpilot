@@ -17,9 +17,6 @@ importers:
       '@prisma/client':
         specifier: ^7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.0.2))(typescript@7.0.2)
-      '@types/node':
-        specifier: ^26.1.1
-        version: 26.5.1
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -45,6 +42,9 @@ importers:
         specifier: ^4.6.2
         version: 4.6.2
     devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.5.1
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.10.0(jiti@2.7.0))
