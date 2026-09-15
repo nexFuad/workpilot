@@ -75,6 +75,19 @@ backend/
 
 Each domain module keeps its route, controller, service, schema, and supporting types together.
 
+### Module convention
+
+```text
+src/modules/<domain>/
+├── <domain>.routes.ts      # HTTP method/path and middleware wiring only
+├── <domain>.controller.ts  # Request parsing and response formatting
+├── <domain>.service.ts     # Business rules and database operations
+└── <domain>.schema.ts      # Zod request/query validation
+```
+
+Cross-cutting authentication, validation, date handling, pagination, Prisma error mapping, and API
+errors live in `src/middleware` and `src/lib` so domain modules do not repeat them.
+
 ## API groups
 
 | Base path                         | Purpose                                                     |
@@ -139,17 +152,18 @@ The standalone API runs at `http://localhost:4000`.
 
 ## Scripts
 
-| Command                   | Description                               |
-| ------------------------- | ----------------------------------------- |
-| `pnpm dev`                | Start the TypeScript server in watch mode |
-| `pnpm build`              | Compile TypeScript to `dist/`             |
-| `pnpm start`              | Start the compiled standalone server      |
-| `pnpm prisma:generate`    | Generate Prisma Client                    |
-| `pnpm prisma:migrate:dev` | Run development migrations                |
-| `pnpm prisma:migrate`     | Apply committed migrations in production  |
-| `pnpm prisma:seed`        | Seed the database                         |
-| `pnpm format`             | Format source files                       |
-| `pnpm format:check`       | Check formatting                          |
+| Command                   | Description                                |
+| ------------------------- | ------------------------------------------ |
+| `pnpm dev`                | Start the TypeScript server in watch mode  |
+| `pnpm build`              | Compile TypeScript to `dist/`              |
+| `pnpm typecheck`          | Validate TypeScript without writing output |
+| `pnpm start`              | Start the compiled standalone server       |
+| `pnpm prisma:generate`    | Generate Prisma Client                     |
+| `pnpm prisma:migrate:dev` | Run development migrations                 |
+| `pnpm prisma:migrate`     | Apply committed migrations in production   |
+| `pnpm prisma:seed`        | Seed the database                          |
+| `pnpm format`             | Format source files                        |
+| `pnpm format:check`       | Check formatting                           |
 
 ## Authentication lifecycle
 

@@ -1,6 +1,7 @@
-import { compare } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { type AuthRole, type TokenPayload, signToken, verifyToken } from '../../lib/jwt.js';
 import { prisma } from '../../lib/prisma.js';
+import type { PasswordInput, ProfileInput } from './auth.schema.js';
 
 export type PublicUser = {
   id: string;
@@ -71,10 +72,11 @@ export async function rotateRefreshToken(token: string) {
   });
   if (!session || session.revokedAt || session.expiresAt < new Date() || !session.user.isActive)
     throw new Error('Expired refresh token');
-  await prisma.refreshSession.update({
-    where: { id: session.id },
+  const revoked = await prisma.refreshSession.updateMany({
+    where: { id: session.id, revokedAt: null, expiresAt: { gt: new Date() } },
     data: { revokedAt: new Date() },
   });
+  if (revoked.count !== 1) throw new Error('Refresh token has already been used');
   const user = toPublicUser(session.user);
   return { user, ...(await createTokenPair(user, session.rememberMe)) };
 }
@@ -98,4 +100,28 @@ export async function revokeRefreshToken(token?: string) {
   } catch {
     // An expired or invalid cookie needs no database change.
   }
+}
+
+export async function updateProfile(userId: string, input: ProfileInput) {
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(input.fullName !== undefined ? { fullName: input.fullName || null } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
+      ...(input.address !== undefined ? { address: input.address || null } : {}),
+      ...(input.profileImage !== undefined ? { profileImage: input.profileImage || null } : {}),
+    },
+  });
+  return toPublicUser(updated);
+}
+
+export async function updatePassword(userId: string, input: PasswordInput) {
+  const account = await prisma.user.findUnique({ where: { id: userId } });
+  if (!account || !(await compare(input.currentPassword, account.passwordHash))) return false;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: await hash(input.newPassword, 12) },
+  });
+  return true;
 }

@@ -10,16 +10,17 @@ import { projectRoutes } from './modules/projects/projects.routes.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
 import { announcementRoutes } from './modules/announcements/announcements.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
-import { hrAttendanceRoutes } from './modules/hr/hr-attendance.routes.js';
-import { hrSettingsRoutes } from './modules/hr/hr-settings.routes.js';
-import { hrLeaveRoutes } from './modules/hr/hr-leave.routes.js';
-import { hrPayrollRoutes } from './modules/hr/hr-payroll.routes.js';
-import { hrAdvancesRoutes } from './modules/hr/hr-advances.routes.js';
-import { hrLoansRoutes } from './modules/hr/hr-loans.routes.js';
-import { hrAnnouncementsRoutes } from './modules/hr/hr-announcements.routes.js';
-import { hrTasksRoutes } from './modules/hr/hr-tasks.routes.js';
-import { hrProjectsRoutes } from './modules/hr/hr-projects.routes.js';
-import { hrEmployeesRoutes } from './modules/hr/hr-employees.routes.js';
+import { hrAdvancesRoutes } from './modules/hr-advances/hr-advances.routes.js';
+import { hrAnnouncementsRoutes } from './modules/hr-announcements/hr-announcements.routes.js';
+import { hrAttendanceRoutes } from './modules/hr-attendance/hr-attendance.routes.js';
+import { hrEmployeesRoutes } from './modules/hr-employees/hr-employees.routes.js';
+import { hrLeaveRoutes } from './modules/hr-leave/hr-leave.routes.js';
+import { hrLoansRoutes } from './modules/hr-loans/hr-loans.routes.js';
+import { hrPayrollRoutes } from './modules/hr-payroll/hr-payroll.routes.js';
+import { hrProjectsRoutes } from './modules/hr-projects/hr-projects.routes.js';
+import { hrSettingsRoutes } from './modules/hr-settings/hr-settings.routes.js';
+import { hrTasksRoutes } from './modules/hr-tasks/hr-tasks.routes.js';
+import { ApiError } from './lib/api-error.js';
 
 export const app = new Hono();
 const allowedOrigins =
@@ -35,6 +36,14 @@ app.use(
     maxAge: 86_400,
   }),
 );
+app.onError((error, c) => {
+  if (error instanceof ApiError) {
+    return c.json({ message: error.message }, error.status);
+  }
+
+  console.error(error);
+  return c.json({ message: 'Internal server error.' }, 500);
+});
 app.get('/', (c) => c.json({ name: 'WorkPilot API', status: 'ok' }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);

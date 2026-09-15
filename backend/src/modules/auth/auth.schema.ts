@@ -28,3 +28,7 @@ export const passwordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8).max(200),
 });
+
+export type LoginInput = z.infer<typeof loginSchema>;
+export type ProfileInput = z.infer<typeof profileSchema>;
+export type PasswordInput = z.infer<typeof passwordSchema>;
