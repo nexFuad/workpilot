@@ -50,3 +50,4 @@ app.route('/api/hr/announcements', hrAnnouncementsRoutes);
 app.route('/api/hr/tasks', hrTasksRoutes);
 app.route('/api/hr/projects', hrProjectsRoutes);
 app.route('/api/hr/employees', hrEmployeesRoutes);
+export default app;
