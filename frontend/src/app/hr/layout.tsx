@@ -23,6 +23,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { roleDashboardPath } from '@/lib/roles';
+import { HrAiChat } from '@/components/hr/HrAiChat';
 
 const links = [
   { label: 'Dashboard', href: '/hr', icon: LayoutDashboard },
@@ -160,6 +161,7 @@ export default function HrLayout({ children }: { children: ReactNode }) {
         </header>
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
+      <HrAiChat />
     </div>
   );
 }

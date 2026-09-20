@@ -20,6 +20,7 @@ import { hrPayrollRoutes } from './modules/hr-payroll/hr-payroll.routes.js';
 import { hrProjectsRoutes } from './modules/hr-projects/hr-projects.routes.js';
 import { hrSettingsRoutes } from './modules/hr-settings/hr-settings.routes.js';
 import { hrTasksRoutes } from './modules/hr-tasks/hr-tasks.routes.js';
+import { hrAiChatRoutes } from './modules/hr-ai-chat/hr-ai-chat.routes.js';
 import { ApiError } from './lib/api-error.js';
 
 export const app = new Hono();
@@ -65,5 +66,6 @@ app.route('/api/hr/announcements', hrAnnouncementsRoutes);
 app.route('/api/hr/tasks', hrTasksRoutes);
 app.route('/api/hr/projects', hrProjectsRoutes);
 app.route('/api/hr/employees', hrEmployeesRoutes);
+app.route('/api/hr/ai-chat', hrAiChatRoutes);
 
 export default app;
