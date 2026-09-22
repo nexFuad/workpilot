@@ -81,7 +81,7 @@ export function HrAiChat() {
     }
   }
   return (
-    <div className="fixed bottom-5 right-5 z-50 sm:bottom-7 sm:right-7">
+    <div className="fixed bottom-5 right-[calc(1.25rem+var(--removed-body-scroll-bar-size,0px))] z-50 sm:bottom-7 sm:right-[calc(1.75rem+var(--removed-body-scroll-bar-size,0px))]">
       {open && (
         <section
           className="mb-3 flex h-[min(620px,calc(100vh-7rem))] w-[calc(100vw-2.5rem)] max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
