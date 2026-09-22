@@ -20,6 +20,8 @@ export type EmployeeDashboard = {
 export type HrDashboard = {
   generatedAt: string;
   summary: {
+    totalTeamMembers: number;
+    activeTeamMembers: number;
     totalEmployees: number;
     activeEmployees: number;
     presentToday: number;

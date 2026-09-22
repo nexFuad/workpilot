@@ -108,32 +108,42 @@ export async function listEmployees(
       : {}),
   };
   const teamWhere: Prisma.UserWhereInput = { role: { in: ['employee', 'hr'] } };
-  const [employees, total, sites, shifts, totalMembers, activeAccounts, employeeCount, payroll] =
-    await Promise.all([
-      prisma.user.findMany({
-        where,
-        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-        skip: query.skip,
-        take: query.limit,
-        include: employeeInclude,
-      }),
-      prisma.user.count({ where }),
-      prisma.site.findMany({
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true, isActive: true },
-      }),
-      prisma.shift.findMany({
-        orderBy: { startTime: 'asc' },
-        select: { id: true, name: true, startTime: true, endTime: true, isActive: true },
-      }),
-      prisma.user.count({ where: teamWhere }),
-      prisma.user.count({ where: { ...teamWhere, isActive: true } }),
-      prisma.user.count({ where: { role: 'employee' } }),
-      prisma.user.aggregate({
-        where: { ...teamWhere, isActive: true },
-        _sum: { basicSalary: true },
-      }),
-    ]);
+  const [
+    employees,
+    total,
+    sites,
+    shifts,
+    totalMembers,
+    activeAccounts,
+    employeeCount,
+    hrCount,
+    payroll,
+  ] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      skip: query.skip,
+      take: query.limit,
+      include: employeeInclude,
+    }),
+    prisma.user.count({ where }),
+    prisma.site.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, isActive: true },
+    }),
+    prisma.shift.findMany({
+      orderBy: { startTime: 'asc' },
+      select: { id: true, name: true, startTime: true, endTime: true, isActive: true },
+    }),
+    prisma.user.count({ where: teamWhere }),
+    prisma.user.count({ where: { ...teamWhere, isActive: true } }),
+    prisma.user.count({ where: { role: 'employee' } }),
+    prisma.user.count({ where: { role: 'hr' } }),
+    prisma.user.aggregate({
+      where: { ...teamWhere, isActive: true },
+      _sum: { basicSalary: true },
+    }),
+  ]);
   return {
     employees: employees.map((employee) => safeEmployee(employee, currentUserId)),
     sites,
@@ -143,6 +153,7 @@ export async function listEmployees(
       total: totalMembers,
       active: activeAccounts,
       employees: employeeCount,
+      hr: hrCount,
       monthlyBasicPayroll: payroll._sum.basicSalary ?? 0,
     },
   };

@@ -24,6 +24,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { roleDashboardPath } from '@/lib/roles';
 import { HrAiChat } from '@/components/hr/HrAiChat';
+import { AuthLoadingScreen } from '@/components/shared/AuthLoadingScreen';
+import { AuthSessionErrorScreen } from '@/components/shared/AuthSessionErrorScreen';
 
 const links = [
   { label: 'Dashboard', href: '/hr', icon: LayoutDashboard },
@@ -43,7 +45,7 @@ const links = [
 export default function HrLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, isFetching, sessionError, retrySession, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const currentPage =
     (pathname === '/hr/employees/create'
@@ -53,9 +55,9 @@ export default function HrLayout({ children }: { children: ReactNode }) {
         : links.find((link) => pathname === link.href)?.label) ??
     (pathname === '/hr/account' ? 'My account' : 'HR workspace');
   useEffect(() => {
-    if (!isLoading && !user) router.replace('/login');
+    if (!isLoading && !sessionError && !user) router.replace('/login');
     else if (user && user.role !== 'hr') router.replace(roleDashboardPath[user.role]);
-  }, [isLoading, router, user]);
+  }, [isLoading, router, sessionError, user]);
   function signOut() {
     logout.mutate(undefined, {
       onSuccess: () => {
@@ -65,28 +67,12 @@ export default function HrLayout({ children }: { children: ReactNode }) {
       onError: () => router.replace('/'),
     });
   }
-  if (isLoading || !user || user.role !== 'hr')
-    return (
-      <main className="flex min-h-screen animate-pulse bg-slate-50" aria-label="Loading workspace">
-        <aside className="hidden w-72 border-r border-slate-200 bg-white p-6 lg:block">
-          <span className="block h-10 w-36 rounded-xl bg-slate-100" />
-          <div className="mt-12 space-y-3">
-            {Array.from({ length: 9 }, (_, index) => (
-              <span key={index} className="block h-11 rounded-xl bg-slate-100" />
-            ))}
-          </div>
-        </aside>
-        <section className="flex-1 p-6 lg:p-8">
-          <span className="block h-8 w-56 rounded bg-slate-200" />
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => (
-              <span key={index} className="h-32 rounded-2xl bg-white shadow-sm" />
-            ))}
-          </div>
-          <div className="mt-6 h-96 rounded-2xl bg-white shadow-sm" />
-        </section>
-      </main>
-    );
+  if (sessionError && !user) {
+    return <AuthSessionErrorScreen isRetrying={isFetching} onRetry={() => void retrySession()} />;
+  }
+  if (isLoading || !user || user.role !== 'hr') {
+    return <AuthLoadingScreen message="Checking your HR workspace access…" />;
+  }
   return (
     <div className="min-h-screen bg-slate-50">
       {menuOpen && (

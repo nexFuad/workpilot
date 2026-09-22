@@ -2,14 +2,81 @@ import { prisma } from '../../lib/prisma.js';
 
 type ToolArgs = { date?: string; query?: string };
 
-const dayRange = (raw?: string) => {
-  const date =
-    raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00.000Z`) : new Date();
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  return { gte: start, lt: end };
-};
+const DHAKA_TIME_ZONE = 'Asia/Dhaka';
+
+type ResolvedDate = { iso: string; display: string };
+
+function validDate(year: number, month: number, day: number): ResolvedDate | null {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  const iso = [year, month, day]
+    .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, '0'))
+    .join('-');
+  return { iso, display: `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` };
+}
+
+function dhakaToday(now = new Date()): ResolvedDate {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: DHAKA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return validDate(value('year'), value('month'), value('day'))!;
+}
+
+function shiftDate(date: ResolvedDate, days: number) {
+  const shifted = new Date(`${date.iso}T00:00:00.000Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return validDate(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate())!;
+}
+
+export function resolveAttendanceDate(raw?: string, now = new Date()): ResolvedDate | null {
+  const input = raw?.trim().toLowerCase();
+  const today = dhakaToday(now);
+  if (!input) return today;
+
+  const iso = input.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (iso) return validDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  const dayFirst = input.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/);
+  if (dayFirst) return validDate(Number(dayFirst[3]), Number(dayFirst[2]), Number(dayFirst[1]));
+
+  if (/\bday before yesterday\b|পরশু/.test(input)) return shiftDate(today, -2);
+  if (/\byesterday\b|\b(?:goto)?kal(?:ke|er)?\b|গতকাল/.test(input)) return shiftDate(today, -1);
+  if (/\btoday\b|\ba?aj(?:ke|ker)?\b|আজ(?:কে|কের)?/.test(input)) return today;
+
+  const daysAgo = input.match(/(\d+)\s*(?:days?|din|দিন)\s*(?:ago|age|ager|agah|আগে|আগের)/);
+  if (daysAgo) {
+    // WorkPilot follows the user's inclusive wording: on the 22nd, "4 days ago" means the 19th.
+    return shiftDate(today, -(Math.max(Number(daysAgo[1]), 1) - 1));
+  }
+
+  return null;
+}
+
+function attendanceDay(raw?: string) {
+  const resolved = resolveAttendanceDate(raw);
+  if (!resolved) return null;
+  const gte = new Date(`${resolved.iso}T00:00:00+06:00`);
+  return {
+    ...resolved,
+    range: { gte, lt: new Date(gte.getTime() + 24 * 60 * 60 * 1000) },
+  };
+}
+
+export function attendanceDateContext(message: string, now = new Date()) {
+  const today = dhakaToday(now);
+  return { today, resolved: resolveAttendanceDate(message, now) };
+}
 
 export const hrChatTools = [
   {
@@ -90,7 +157,7 @@ export const hrChatTools = [
     function: {
       name: 'get_attendance_summary',
       description:
-        'Get attendance totals and absent employee names for a date. Use YYYY-MM-DD when the user specifies a date.',
+        'Get attendance totals and absent employee names for a date. Accepts DD/MM/YYYY, YYYY-MM-DD, today, yesterday, or N days ago.',
       parameters: {
         type: 'object',
         properties: { date: { type: 'string' } },
@@ -162,14 +229,22 @@ export async function executeHrChatTool(name: string, args: ToolArgs, companyNam
     };
   }
   if (name === 'get_attendance_summary') {
-    const range = dayRange(args.date);
+    const date = attendanceDay(args.date);
+    if (!date) {
+      return {
+        error: 'Invalid date. Use DD/MM/YYYY, YYYY-MM-DD, today, yesterday, or N days ago.',
+      };
+    }
     const [employees, records] = await Promise.all([
       prisma.user.findMany({
         where: { companyName, role: 'employee', isActive: true },
         select: { id: true, fullName: true, employeeId: true },
       }),
       prisma.attendance.findMany({
-        where: { checkInAt: range, user: { companyName } },
+        where: {
+          checkInAt: date.range,
+          user: { companyName, role: 'employee', isActive: true },
+        },
         select: { userId: true },
       }),
     ]);
@@ -179,7 +254,9 @@ export async function executeHrChatTool(name: string, args: ToolArgs, companyNam
       .slice(0, 20)
       .map(({ fullName, employeeId }) => ({ fullName, employeeId }));
     return {
-      date: args.date ?? new Date().toISOString().slice(0, 10),
+      date: date.display,
+      isoDate: date.iso,
+      timeZone: DHAKA_TIME_ZONE,
       total: employees.length,
       present: present.size,
       absentCount: employees.length - present.size,

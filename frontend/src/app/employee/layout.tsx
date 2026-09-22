@@ -20,6 +20,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { roleDashboardPath } from '@/lib/roles';
+import { AuthLoadingScreen } from '@/components/shared/AuthLoadingScreen';
+import { AuthSessionErrorScreen } from '@/components/shared/AuthSessionErrorScreen';
 
 const links = [
   { label: 'Overview', href: '/employee', icon: LayoutDashboard },
@@ -37,12 +39,12 @@ const links = [
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, isFetching, sessionError, retrySession, logout } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => {
-    if (!isLoading && !user) router.replace('/login');
+    if (!isLoading && !sessionError && !user) router.replace('/login');
     else if (user && user.role !== 'employee') router.replace(roleDashboardPath[user.role]);
-  }, [isLoading, router, user]);
+  }, [isLoading, router, sessionError, user]);
   function signOut() {
     logout.mutate(undefined, {
       onSuccess: () => {
@@ -52,21 +54,12 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
       onError: () => router.replace('/'),
     });
   }
-  if (isLoading || !user || user.role !== 'employee')
-    return (
-      <main
-        className="min-h-screen animate-pulse bg-slate-50 p-4 sm:p-6 lg:p-8"
-        aria-label="Loading workspace"
-      >
-        <span className="block h-8 w-56 rounded bg-slate-200" />
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
-            <span key={index} className="h-32 rounded-2xl bg-white shadow-sm" />
-          ))}
-        </div>
-        <div className="mt-6 h-96 rounded-2xl bg-white shadow-sm" />
-      </main>
-    );
+  if (sessionError && !user) {
+    return <AuthSessionErrorScreen isRetrying={isFetching} onRetry={() => void retrySession()} />;
+  }
+  if (isLoading || !user || user.role !== 'employee') {
+    return <AuthLoadingScreen message="Checking your employee workspace access…" />;
+  }
   const mobileLinks = links.slice(0, 3);
   const extraLinks = links.slice(3);
   return (

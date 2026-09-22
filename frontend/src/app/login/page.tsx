@@ -10,6 +10,8 @@ import { z } from 'zod';
 import { useAuth } from '@/hooks/use-auth';
 import { roleDashboardPath } from '@/lib/roles';
 import type { LoginInput } from '@/types/auth.types';
+import { AuthLoadingScreen } from '@/components/shared/AuthLoadingScreen';
+import { AuthSessionErrorScreen } from '@/components/shared/AuthSessionErrorScreen';
 import { Logo } from '@/components/shared/Logo';
 
 const loginFormSchema = z.object({
@@ -21,7 +23,7 @@ const loginFormSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, login } = useAuth();
+  const { user, isLoading, isFetching, sessionError, retrySession, login } = useAuth();
   const {
     register,
     handleSubmit,
@@ -33,6 +35,15 @@ export default function LoginPage() {
   useEffect(() => {
     if (user) router.replace(roleDashboardPath[user.role]);
   }, [router, user]);
+
+  if (sessionError && !user) {
+    return <AuthSessionErrorScreen isRetrying={isFetching} onRetry={() => void retrySession()} />;
+  }
+
+  if (isLoading || user) {
+    return <AuthLoadingScreen />;
+  }
+
   const onSubmit = (values: LoginInput) =>
     login.mutate(values, {
       onSuccess: ({ user: signedInUser }) => {

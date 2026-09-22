@@ -60,6 +60,8 @@ export async function getHrDashboard() {
     select: { month: true },
   });
   const [
+    totalTeamMembers,
+    activeTeamMembers,
     totalEmployees,
     activeEmployees,
     employees,
@@ -79,6 +81,8 @@ export async function getHrDashboard() {
     priorityTasks,
     announcements,
   ] = await Promise.all([
+    prisma.user.count({ where: { role: { in: ['employee', 'hr'] } } }),
+    prisma.user.count({ where: { role: { in: ['employee', 'hr'] }, isActive: true } }),
     prisma.user.count({ where: { role: 'employee' } }),
     prisma.user.count({ where: { role: 'employee', isActive: true } }),
     prisma.user.findMany({
@@ -240,6 +244,8 @@ export async function getHrDashboard() {
   return {
     generatedAt: new Date(),
     summary: {
+      totalTeamMembers,
+      activeTeamMembers,
       totalEmployees,
       activeEmployees,
       presentToday,

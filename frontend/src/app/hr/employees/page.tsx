@@ -161,7 +161,7 @@ export default function EmployeesPage() {
         </Link>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           { label: 'Team members', value: summary?.total ?? 0, icon: UsersRound },
           {
@@ -173,6 +173,11 @@ export default function EmployeesPage() {
             label: 'Employees',
             value: summary?.employees ?? 0,
             icon: UserRound,
+          },
+          {
+            label: 'HR members',
+            value: summary?.hr ?? 0,
+            icon: UserCheck,
           },
           {
             label: 'Monthly basic payroll',

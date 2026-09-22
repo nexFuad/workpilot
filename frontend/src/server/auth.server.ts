@@ -36,7 +36,7 @@ function refreshAccessToken() {
   return refreshRequest;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
@@ -74,7 +74,14 @@ export async function apiRequest<T>(
 export const authServer = {
   login: (input: LoginInput) =>
     apiRequest<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(input) }),
-  me: () => apiRequest<SessionResponse>('/api/auth/session', {}, false),
+  me: async () => {
+    try {
+      return await apiRequest<SessionResponse>('/api/auth/session');
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) return { user: null };
+      throw error;
+    }
+  },
   logout: () => apiRequest<{ message: string }>('/api/auth/logout', { method: 'POST' }, false),
   updateProfile: (data: {
     fullName?: string;

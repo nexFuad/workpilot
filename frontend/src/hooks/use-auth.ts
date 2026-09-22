@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { authServer } from '@/server/auth.server';
+import { ApiError, authServer } from '@/server/auth.server';
 import type { LoginInput } from '@/types/auth.types';
 
 const authKey = ['auth', 'me'] as const;
@@ -10,7 +10,8 @@ export function useAuth() {
   const query = useQuery({
     queryKey: authKey,
     queryFn: authServer.me,
-    retry: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 401) && failureCount < 2,
     staleTime: 5 * 60 * 1000,
   });
   const login = useMutation({
@@ -28,7 +29,10 @@ export function useAuth() {
   const updatePassword = useMutation({ mutationFn: authServer.updatePassword });
   return {
     user: query.data?.user,
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
+    isFetching: query.isFetching,
+    sessionError: query.error,
+    retrySession: query.refetch,
     isAuthenticated: Boolean(query.data?.user),
     login,
     logout,

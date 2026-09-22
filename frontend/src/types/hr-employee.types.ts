@@ -86,6 +86,7 @@ export type HrEmployeesResponse = {
     total: number;
     active: number;
     employees: number;
+    hr: number;
     monthlyBasicPayroll: number;
   };
 };

@@ -30,6 +30,8 @@ export function SoftSelect({
   tone = 'sky',
   compact = false,
   triggerClassName = '',
+  contentClassName = '',
+  viewportClassName = '',
 }: {
   value?: string;
   onValueChange: (value: string) => void;
@@ -39,6 +41,8 @@ export function SoftSelect({
   tone?: keyof typeof tones;
   compact?: boolean;
   triggerClassName?: string;
+  contentClassName?: string;
+  viewportClassName?: string;
 }) {
   const styles = tones[tone];
   return (
@@ -55,19 +59,21 @@ export function SoftSelect({
         <Select.Content
           position="popper"
           sideOffset={6}
-          className={`z-60 max-h-64 min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl border bg-white p-1 ${styles.content}`}
+          className={`z-60 w-(--radix-select-trigger-width) max-w-(--radix-select-trigger-width) overflow-hidden rounded-xl border bg-white p-1 ${styles.content} ${contentClassName}`}
         >
-          <Select.Viewport>
+          <Select.Viewport
+            className={`max-h-60 overflow-y-auto [scrollbar-color:#cbd5e1_transparent] scrollbar-thin [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 ${viewportClassName}`}
+          >
             {options.map((option) => (
               <Select.Item
                 key={option.value}
                 value={option.value}
-                className={`relative flex cursor-pointer select-none items-center rounded-lg py-2.5 pl-8 pr-3 text-sm text-slate-700 outline-none data-disabled:pointer-events-none data-disabled:opacity-50 data-[state=checked]:font-semibold ${styles.item}`}
+                className={`relative flex min-w-0 cursor-pointer select-none items-center rounded-lg py-2.5 pl-8 pr-3 text-sm text-slate-700 outline-none data-disabled:pointer-events-none data-disabled:opacity-50 data-[state=checked]:font-semibold ${styles.item}`}
               >
                 <Select.ItemIndicator className="absolute left-2">
                   <Check className="size-4" />
                 </Select.ItemIndicator>
-                <Select.ItemText>{option.label}</Select.ItemText>
+                <Select.ItemText className="truncate">{option.label}</Select.ItemText>
               </Select.Item>
             ))}
           </Select.Viewport>

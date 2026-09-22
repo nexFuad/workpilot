@@ -3,6 +3,7 @@
 import { Bot, LoaderCircle, MessageCircle, Plus, SendHorizontal, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { SoftSelect } from '@/components/ui/SoftSelect';
 import {
   hrAiChatServer,
   type HrAiChatMessage,
@@ -15,6 +16,13 @@ const suggestions = [
   'Give me workforce analytics',
   'Show task and project analytics',
 ];
+
+const conversationDate = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
 
 export function HrAiChat() {
   const [open, setOpen] = useState(false);
@@ -107,21 +115,22 @@ export function HrAiChat() {
             </div>
           </header>
           {conversations.length > 0 && (
-            <div className="border-b border-slate-200 bg-white px-3 py-2">
-              <select
+            <div className="w-full overflow-hidden border-b border-slate-200 bg-white px-3 py-2.5">
+              <SoftSelect
                 value={conversationId ?? ''}
-                onChange={(event) => event.target.value && loadConversation(event.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600"
-              >
-                <option value="" disabled>
-                  Select previous conversation
-                </option>
-                {conversations.map((conversation) => (
-                  <option key={conversation.id} value={conversation.id}>
-                    {new Date(conversation.updatedAt).toLocaleString()} · {conversation.title}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(value) => void loadConversation(value)}
+                placeholder="Select previous conversation"
+                disabled={loading}
+                tone="emerald"
+                compact
+                triggerClassName="h-10 min-w-0 rounded-xl bg-slate-50/70 px-3 text-xs font-semibold"
+                contentClassName="max-h-64 rounded-xl"
+                viewportClassName="max-h-56"
+                options={conversations.map((conversation) => ({
+                  value: conversation.id,
+                  label: `${conversationDate.format(new Date(conversation.updatedAt))} · ${conversation.title}`,
+                }))}
+              />
             </div>
           )}
           <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">

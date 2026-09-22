@@ -12,7 +12,6 @@ import { loginSchema, passwordSchema, profileSchema } from './auth.schema.js';
 import {
   authenticateUser,
   createLoginSession,
-  getCurrentUser,
   revokeRefreshToken,
   rotateRefreshToken,
   updatePassword,
@@ -83,28 +82,6 @@ export async function logout(c: Context) {
   await revokeRefreshToken(getCookie(c, REFRESH_COOKIE));
   clearAuthCookies(c);
   return c.json({ message: 'Logged out successfully.' });
-}
-
-export async function session(c: Context) {
-  try {
-    return c.json({ user: await getCurrentUser(getCookie(c, ACCESS_COOKIE) ?? '') });
-  } catch {
-    const refreshToken = getCookie(c, REFRESH_COOKIE);
-    if (!refreshToken) return c.json({ user: null });
-    try {
-      const refreshSession = await rotateRefreshToken(refreshToken);
-      setAuthCookies(
-        c,
-        refreshSession.accessToken,
-        refreshSession.refreshToken,
-        refreshSession.refreshDays,
-      );
-      return c.json({ user: refreshSession.user });
-    } catch {
-      clearAuthCookies(c);
-      return c.json({ user: null });
-    }
-  }
 }
 
 export async function me(c: Context<AppEnv>) {

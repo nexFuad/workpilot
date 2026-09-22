@@ -142,9 +142,9 @@ export default function HrPage() {
     data.summary.pendingDocuments;
   const summaryCards = [
     {
-      label: 'Total employees',
-      value: data.summary.totalEmployees,
-      detail: `${data.summary.activeEmployees} active accounts`,
+      label: 'Total team members',
+      value: data.summary.totalTeamMembers,
+      detail: `${data.summary.activeTeamMembers} active accounts`,
       icon: UsersRound,
       href: '/hr/employees',
       tone: 'bg-emerald-50 text-emerald-700',
