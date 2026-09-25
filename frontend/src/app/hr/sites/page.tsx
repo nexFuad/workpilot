@@ -1,18 +1,18 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { HrHeader } from '@/components/hr/HrHeader';
+import { HrSiteDialog } from '@/components/hr/HrSiteDialog';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LoaderCircle, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { hrSettingsServer, type Site } from '@/server/hr-settings.server';
 
 const empty = { name: '', location: '', isActive: true };
-const fieldClass =
-  'mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100';
-
 export default function SitesPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -87,38 +87,32 @@ export default function SitesPage() {
 
   return (
     <section className="w-full space-y-6 pb-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-            HR workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-800">Sites</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Create and manage employee attendance locations.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => start()}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:self-auto"
-        >
-          <Plus className="size-4" /> Create site
-        </button>
-      </header>
+      <HrHeader
+        title="Sites"
+        description="Create and manage employee attendance locations."
+        action={
+          <button
+            type="button"
+            onClick={() => start()}
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:self-auto"
+          >
+            <Plus className="size-4" /> Create site
+          </button>
+        }
+      />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="relative block w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={api.sites.searchTerm}
-            onChange={(event) => {
-              api.sites.setSearchTerm(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search site name or location..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full sm:max-w-md"
+          iconClassName="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+          value={api.sites.searchTerm}
+          onChange={(event) => {
+            api.sites.setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Search site name or location..."
+          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+        />
       </div>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -227,107 +221,30 @@ export default function SitesPage() {
         </div>
       </section>
 
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-2xl font-bold text-slate-800">
-                  {editing ? 'Edit site' : 'Create site'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1.5 text-sm text-slate-500">
-                  Add an attendance location for employees.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200">
-                <X className="size-4" />
-              </Dialog.Close>
-            </div>
-            <form onSubmit={save} className="mt-6 space-y-4">
-              <label className="block text-sm font-bold text-slate-700">
-                Site name
-                <input
-                  required
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  placeholder="Enter site name"
-                  className={fieldClass}
-                />
-              </label>
-              <label className="block text-sm font-bold text-slate-700">
-                Location / address
-                <input
-                  required
-                  value={form.location}
-                  onChange={(event) => setForm({ ...form, location: event.target.value })}
-                  placeholder="Enter location or address"
-                  className={fieldClass}
-                />
-              </label>
-              <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3.5">
-                <div>
-                  <p className="text-sm font-bold text-slate-700">Active site</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Available for attendance</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={form.isActive}
-                  onClick={() => setForm({ ...form, isActive: !form.isActive })}
-                  className={`relative h-5 w-9 rounded-full ${form.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                >
-                  <span
-                    className={`absolute top-1 size-3 rounded-full bg-white transition ${form.isActive ? 'left-5' : 'left-1'}`}
-                  />
-                </button>
-              </div>
-              <button
-                disabled={saving}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {saving && <LoaderCircle className="size-4 animate-spin" />}
-                {editing ? 'Save changes' : 'Create site'}
-              </button>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <HrSiteDialog
+        open={open}
+        onOpenChange={setOpen}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        onSubmit={save}
+        isSaving={saving}
+      />
 
-      <Dialog.Root
+      <DeleteModal
         open={Boolean(deleteTarget)}
-        onOpenChange={(value) => !value && setDeleteTarget(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-11 place-items-center rounded-xl bg-rose-50 text-rose-600">
-              <Trash2 className="size-5" />
-            </span>
-            <Dialog.Title className="mt-4 text-xl font-bold text-slate-800">
-              Delete this site?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
-              “{deleteTarget?.name}” will be permanently deleted if it is not used by attendance
-              records.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3">
-              <Dialog.Close className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                Cancel
-              </Dialog.Close>
-              <button
-                type="button"
-                disabled={api.remove.isPending}
-                onClick={() => void remove()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {api.remove.isPending && <LoaderCircle className="size-4 animate-spin" />}
-                Delete site
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleteTarget(null)}
+        onDelete={() => void remove()}
+        isDeleting={api.remove.isPending}
+        title="Delete this site?"
+        description={
+          <>
+            “{deleteTarget?.name}” will be permanently deleted if it is not used by attendance
+            records.
+          </>
+        }
+        confirmLabel="Delete site"
+      />
     </section>
   );
 }

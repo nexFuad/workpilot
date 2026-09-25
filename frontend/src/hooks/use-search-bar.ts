@@ -1,7 +1,8 @@
 'use client';
 
-import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useInfiniteQuery, useQuery, type QueryKey } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 
 type UseSearchBarOptions<TData> = {
   queryKey: QueryKey;
@@ -9,27 +10,51 @@ type UseSearchBarOptions<TData> = {
   debounceMs?: number;
 };
 
-/**
- * Reusable server-side search hook. Pass the API function for a feature; this
- * hook only debounces the text and requests results—it never filters local data.
- */
+function useSearchTerm(debounceMs: number) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), debounceMs);
+  return { searchTerm, setSearchTerm, debouncedSearch };
+}
+
+/** Debounces search text and fetches a page from the feature's API. */
 export function useSearchBar<TData>({
   queryKey,
   queryFn,
   debounceMs = 350,
 }: UseSearchBarOptions<TData>) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), debounceMs);
-    return () => clearTimeout(timer);
-  }, [debounceMs, searchTerm]);
+  const search = useSearchTerm(debounceMs);
 
   const query = useQuery({
-    queryKey: [...queryKey, debouncedSearch],
-    queryFn: () => queryFn(debouncedSearch),
+    queryKey: [...queryKey, search.debouncedSearch],
+    queryFn: () => queryFn(search.debouncedSearch),
   });
 
-  return { searchTerm, setSearchTerm, debouncedSearch, ...query };
+  return { ...search, ...query };
+}
+
+type UseInfiniteSearchBarOptions<TPage> = {
+  queryKey: QueryKey;
+  queryFn: (search: string, pageParam: number) => Promise<TPage>;
+  getNextPageParam: (lastPage: TPage) => number | undefined;
+  initialPageParam?: number;
+  debounceMs?: number;
+};
+
+/** Shares search behavior with useSearchBar while retaining infinite pagination. */
+export function useInfiniteSearchBar<TPage>({
+  queryKey,
+  queryFn,
+  getNextPageParam,
+  initialPageParam = 0,
+  debounceMs = 350,
+}: UseInfiniteSearchBarOptions<TPage>) {
+  const search = useSearchTerm(debounceMs);
+  const query = useInfiniteQuery({
+    queryKey: [...queryKey, search.debouncedSearch],
+    queryFn: ({ pageParam }) => queryFn(search.debouncedSearch, pageParam),
+    initialPageParam,
+    getNextPageParam,
+  });
+
+  return { ...search, ...query };
 }

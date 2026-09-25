@@ -1,30 +1,30 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { HrHeader } from '@/components/hr/HrHeader';
+import { HrTaskEditorDialog } from '@/components/hr/HrTaskEditorDialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   CheckCircle2,
   CircleDot,
   ClipboardCheck,
   Clock3,
-  LoaderCircle,
   MoreHorizontal,
   PencilLine,
   Plus,
-  Search,
   Trash2,
   UserRound,
-  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
 import { SoftSelect } from '@/components/ui/SoftSelect';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { SearchInput } from '@/components/shared/SearchInput';
+import { useSearchBar } from '@/hooks/use-search-bar';
 import { hrTasksServer } from '@/server/hr-tasks.server';
-import type { HrTask, HrTaskInput, TaskPriority } from '@/types/hr-task.types';
+import type { HrTask, HrTaskInput, HrTaskUpdate, TaskPriority } from '@/types/hr-task.types';
 import type { TaskStatus } from '@/types/task.types';
 
 const emptyForm: HrTaskInput = {
@@ -53,9 +53,6 @@ const priorityStyle: Record<TaskPriority, string> = {
   medium: 'bg-amber-50 text-amber-700',
   high: 'bg-rose-50 text-rose-700',
 };
-
-const fieldClass =
-  'mt-2 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100';
 
 function toInput(task: HrTask): HrTaskInput {
   return {
@@ -88,16 +85,13 @@ export default function HrTasksPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<'all' | TaskStatus>('all');
-  const [search, setSearch] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<HrTask | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<HrTask | null>(null);
   const [form, setForm] = useState<HrTaskInput>(emptyForm);
-  const debouncedSearch = useDebouncedValue(search.trim());
-  const params = { search: debouncedSearch, status, page, limit: 10 };
-  const tasksQuery = useQuery({
-    queryKey: ['hr', 'tasks', params],
-    queryFn: () => hrTasksServer.list(params),
+  const tasksQuery = useSearchBar({
+    queryKey: ['hr', 'tasks', { status, page, limit: 10 }],
+    queryFn: (search) => hrTasksServer.list({ search, status, page, limit: 10 }),
   });
   const refreshTasks = async () => {
     await Promise.all([
@@ -107,8 +101,7 @@ export default function HrTasksPage() {
   };
   const create = useMutation({ mutationFn: hrTasksServer.create, onSuccess: refreshTasks });
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: HrTaskInput }) =>
-      hrTasksServer.update(id, input),
+    mutationFn: ({ id, input }: HrTaskUpdate) => hrTasksServer.update(id, input),
     onSuccess: refreshTasks,
   });
   const removeTask = useMutation({ mutationFn: hrTasksServer.remove, onSuccess: refreshTasks });
@@ -176,26 +169,21 @@ export default function HrTasksPage() {
 
   return (
     <section className="w-full space-y-6 pb-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-            HR workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-800">Assign tasks</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Assign work to employees and track progress from one place.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          disabled={!employees.length && !api.tasks.isLoading}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
-        >
-          <Plus className="size-4" />
-          Assign task
-        </button>
-      </header>
+      <HrHeader
+        title="Assign tasks"
+        description="Assign work to employees and track progress from one place."
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={!employees.length && !api.tasks.isLoading}
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+          >
+            <Plus className="size-4" />
+            Assign task
+          </button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -236,18 +224,17 @@ export default function HrTasksPage() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <label className="relative block w-full lg:max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search task or employee..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:bg-white"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full lg:max-w-sm"
+          iconClassName="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+          value={tasksQuery.searchTerm}
+          onChange={(event) => {
+            tasksQuery.setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Search task or employee..."
+          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:bg-white"
+        />
         <div className="flex flex-wrap gap-2">
           {(['all', 'todo', 'in_progress', 'completed'] as const).map((item) => (
             <button
@@ -404,165 +391,31 @@ export default function HrTasksPage() {
         </div>
       </section>
 
-      <Dialog.Root open={editorOpen} onOpenChange={setEditorOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-2xl font-bold text-slate-800">
-                  {editing ? 'Edit assigned task' : 'Assign a new task'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1.5 text-sm text-slate-500">
-                  Select an employee and provide clear work instructions.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200">
-                <X className="size-4" />
-              </Dialog.Close>
-            </div>
+      <HrTaskEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        employees={employees}
+        onSubmit={save}
+        isSaving={saving}
+      />
 
-            <form onSubmit={save} className="mt-6 grid gap-5 sm:grid-cols-2">
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Assign to employee
-                <SoftSelect
-                  value={form.userId || undefined}
-                  onValueChange={(value) => setForm({ ...form, userId: value })}
-                  placeholder="Select an employee"
-                  tone="emerald"
-                  options={employees.map((employee) => ({
-                    value: employee.id,
-                    label: `${employee.fullName || employee.employeeId} · ${employee.employeeId}`,
-                  }))}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Task title
-                <input
-                  required
-                  minLength={3}
-                  maxLength={160}
-                  value={form.title}
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                  placeholder="e.g. Complete attendance report"
-                  className={fieldClass}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Task description
-                <textarea
-                  rows={5}
-                  maxLength={1200}
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  placeholder="Add requirements, expected output and necessary instructions..."
-                  className={`${fieldClass} resize-none leading-6`}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Priority
-                <SoftSelect
-                  value={form.priority}
-                  onValueChange={(value) => setForm({ ...form, priority: value as TaskPriority })}
-                  placeholder="Select priority"
-                  tone="emerald"
-                  options={[
-                    { value: 'low', label: 'Low priority' },
-                    { value: 'medium', label: 'Medium priority' },
-                    { value: 'high', label: 'High priority' },
-                  ]}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Deadline
-                <input
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(event) => setForm({ ...form, dueDate: event.target.value })}
-                  className={fieldClass}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Task status
-                <SoftSelect
-                  value={form.status}
-                  onValueChange={(value) => setForm({ ...form, status: value as TaskStatus })}
-                  placeholder="Select task status"
-                  tone="emerald"
-                  options={[
-                    { value: 'todo', label: 'To do' },
-                    { value: 'in_progress', label: 'In progress' },
-                    { value: 'completed', label: 'Completed' },
-                  ]}
-                />
-              </label>
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:col-span-2 sm:flex-row sm:justify-end">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {saving ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : (
-                    <ClipboardCheck className="size-4" />
-                  )}
-                  {editing ? 'Save changes' : 'Assign task'}
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root
+      <DeleteModal
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-11 place-items-center rounded-xl bg-rose-50 text-rose-600">
-              <Trash2 className="size-5" />
-            </span>
-            <Dialog.Title className="mt-4 text-xl font-bold text-slate-800">
-              Delete assigned task?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
-              “{deleteTarget?.title}” will be permanently removed from{' '}
-              {deleteTarget?.user.fullName || deleteTarget?.user.employeeId}&apos;s task list.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3">
-              <Dialog.Close className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                Cancel
-              </Dialog.Close>
-              <button
-                type="button"
-                disabled={api.remove.isPending}
-                onClick={() => void remove()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {api.remove.isPending && <LoaderCircle className="size-4 animate-spin" />}
-                Delete task
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleteTarget(null)}
+        onDelete={() => void remove()}
+        isDeleting={api.remove.isPending}
+        title="Delete assigned task?"
+        description={
+          <>
+            “{deleteTarget?.title}” will be permanently removed from{' '}
+            {deleteTarget?.user.fullName || deleteTarget?.user.employeeId}&apos;s task list.
+          </>
+        }
+        confirmLabel="Delete task"
+      />
     </section>
   );
 }

@@ -1,15 +1,17 @@
 'use client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileImage, FileText, LoaderCircle, Search, Upload, X } from 'lucide-react';
+import { FileImage, FileText, LoaderCircle, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useCloudinaryUpload } from '@/hooks/use-cloudinary-upload';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { documentsServer } from '@/server/documents.server';
 
 const formatSize = (size: number) =>
   `${(size / 1024 / 1024).toFixed(size < 1024 * 1024 ? 1 : 0)} MB`;
+
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,16 +103,14 @@ export default function DocumentsPage() {
         </div>
       </section>
       <div>
-        <label className="relative block w-full sm:max-w-md">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
-          <input
-            type="search"
-            value={documents.searchTerm}
-            onChange={(event) => documents.setSearchTerm(event.target.value)}
-            placeholder="Search document name, type or status..."
-            className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full sm:max-w-md"
+          iconClassName="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600"
+          value={documents.searchTerm}
+          onChange={(event) => documents.setSearchTerm(event.target.value)}
+          placeholder="Search document name, type or status..."
+          className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+        />
         {documents.isFetching && !documents.isLoading ? (
           <p className="mt-2 text-xs font-medium text-slate-500">Searching documents…</p>
         ) : null}

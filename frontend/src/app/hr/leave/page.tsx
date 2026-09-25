@@ -1,9 +1,11 @@
 'use client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Search, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
+import { HrHeader } from '@/components/hr/HrHeader';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { hrLeaveServer } from '@/server/hr-leave.server';
 const format = (value: string) =>
@@ -39,39 +41,32 @@ export default function LeavePage() {
   };
   return (
     <section className="w-full space-y-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-          HR workspace
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold text-slate-800">Leave requests</h1>
-          {api.requests.isLoading ? (
+      <HrHeader
+        title="Leave requests"
+        description="Review employee leave requests and update their approval status."
+        badge={
+          api.requests.isLoading ? (
             <span className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
           ) : (
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
               {pagination?.total ?? 0} request(s)
             </span>
-          )}
-        </div>
-        <p className="mt-2 text-sm text-slate-600">
-          Review employee leave requests and update their approval status.
-        </p>
-      </div>
+          )
+        }
+      />
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <label className="relative block w-full lg:max-w-md">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="search"
-              value={api.requests.searchTerm}
-              onChange={(event) => {
-                api.requests.setSearchTerm(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search name/type/reason or 2026-09 / September 2026..."
-              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
+          <SearchInput
+            wrapperClassName="relative block w-full lg:max-w-md"
+            iconClassName="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+            value={api.requests.searchTerm}
+            onChange={(event) => {
+              api.requests.setSearchTerm(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Search name/type/reason or 2026-09 / September 2026..."
+            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+          />
           <div className="flex flex-wrap gap-2">
             {['all', 'pending', 'approved', 'rejected'].map((item) => (
               <button

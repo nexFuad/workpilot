@@ -11,11 +11,13 @@ import {
 import Link from 'next/link';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
 import { dashboardServer } from '@/server/dashboard.server';
+
 const money = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   maximumFractionDigits: 0,
 });
+
 export default function EmployeePage() {
   const dashboard = useQuery({
     queryKey: ['dashboard', 'employee'],

@@ -32,6 +32,8 @@ export type HrTaskInput = {
   dueDate: string;
 };
 
+export type HrTaskUpdate = { id: string; input: HrTaskInput };
+
 export type HrTasksResponse = {
   tasks: HrTask[];
   employees: HrTaskEmployee[];

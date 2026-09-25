@@ -1,88 +1,25 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, Clock3, History, ImagePlus, Search, X } from 'lucide-react';
+import { Clock3, History } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from 'zod';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
-import { SoftSelect } from '@/components/ui/SoftSelect';
+import { AttendanceDialog } from '@/components/employee/AttendanceDialog';
+import { AttendanceHistoryCard } from '@/components/employee/AttendanceHistoryCard';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useCloudinaryUpload } from '@/hooks/use-cloudinary-upload';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { attendanceServer } from '@/server/attendance.server';
-import type { Attendance, AttendanceAction } from '@/types/attendance.types';
-
-const schema = z.object({
-  siteId: z.string().min(1, 'Select a site'),
-  shiftId: z.string().min(1, 'Select a shift'),
-  occurredTime: z.string().min(1, 'Choose a time'),
-  photo: z.custom<File>().refine(Boolean, 'Take a live photo to continue'),
-});
-type FormValues = z.infer<typeof schema>;
+import { attendanceSchema } from '@/types/attendance.types';
+import type { AttendanceAction, AttendanceFormValues } from '@/types/attendance.types';
 const localTime = () => new Date().toTimeString().slice(0, 5);
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
 const formatTime = (value: string) =>
   new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(new Date(value));
 const formatDay = (value: string) =>
   new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(value));
-
-function HistoryCard({ attendance }: { attendance: Attendance }) {
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-slate-800">{attendance.checkInSite.name}</p>
-          <p className="mt-1 text-sm text-slate-500">{attendance.checkInShift.name}</p>
-        </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${attendance.checkOutAt ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
-        >
-          {attendance.checkOutAt ? 'Work completed' : 'On working'}
-        </span>
-      </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <div className="space-y-2 text-sm text-slate-600">
-          <p>
-            <span className="font-medium text-sky-700">Check in: </span>
-            {formatDate(attendance.checkInAt)}
-          </p>
-          <p>
-            <span className="font-medium text-slate-700">Check out: </span>
-            {attendance.checkOutAt ? formatDate(attendance.checkOutAt) : 'Pending'}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <figure>
-            <span
-              style={{ backgroundImage: `url(${attendance.checkInPhotoUrl})` }}
-              className="block size-14 rounded-xl bg-sky-50 bg-cover bg-center"
-            />
-            <figcaption className="mt-1 text-center text-[10px] font-semibold text-sky-700">
-              Check-in photo
-            </figcaption>
-          </figure>
-          {attendance.checkOutPhotoUrl && (
-            <figure>
-              <span
-                style={{ backgroundImage: `url(${attendance.checkOutPhotoUrl})` }}
-                className="block size-14 rounded-xl bg-sky-50 bg-cover bg-center"
-              />
-              <figcaption className="mt-1 text-center text-[10px] font-semibold text-emerald-700">
-                Check-out photo
-              </figcaption>
-            </figure>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
@@ -127,8 +64,8 @@ export default function AttendancePage() {
     reset,
     control,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  } = useForm<AttendanceFormValues>({
+    resolver: zodResolver(attendanceSchema),
     defaultValues: { siteId: '', shiftId: '', occurredTime: localTime(), photo: undefined },
   });
   const siteId = useWatch({ control, name: 'siteId' });
@@ -200,7 +137,7 @@ export default function AttendancePage() {
       0.9,
     );
   };
-  const submitAttendance = async (values: FormValues) => {
+  const submitAttendance = async (values: AttendanceFormValues) => {
     try {
       const photoUrl = await uploadImage(values.photo);
       const occurredAt = new Date();
@@ -362,15 +299,14 @@ export default function AttendancePage() {
       ) : (
         <>
           <div className="mb-5 max-w-md">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
-              <input
-                value={attendanceSearch.searchTerm}
-                onChange={(event) => attendanceSearch.setSearchTerm(event.target.value)}
-                placeholder="Search site, shift, time, or status"
-                className="w-full rounded-xl border border-sky-100 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:ring-4 focus:ring-sky-100"
-              />
-            </label>
+            <SearchInput
+              wrapperClassName="relative block"
+              iconClassName="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sky-600"
+              value={attendanceSearch.searchTerm}
+              onChange={(event) => attendanceSearch.setSearchTerm(event.target.value)}
+              placeholder="Search site, shift, time, or status"
+              className="w-full rounded-xl border border-sky-100 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:ring-4 focus:ring-sky-100"
+            />
             {attendanceSearch.isFetching && (
               <p className="mt-2 text-xs text-slate-500">Searching attendance records…</p>
             )}
@@ -391,7 +327,7 @@ export default function AttendancePage() {
                 </article>
               ))}
             {records.slice(0, visibleCount).map((attendance) => (
-              <HistoryCard key={attendance.id} attendance={attendance} />
+              <AttendanceHistoryCard key={attendance.id} attendance={attendance} />
             ))}
             {!attendanceSearch.isLoading && records.length === 0 && (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 lg:col-span-2">
@@ -412,150 +348,31 @@ export default function AttendancePage() {
         </>
       )}
 
-      <Dialog.Root
-        open={actionOpen}
-        onOpenChange={(open) => (open ? setActionOpen(true) : closeActionModal())}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-[1px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-sky-100 bg-white p-5 shadow-2xl sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-xl font-bold text-slate-800">
-                  {actionLabel}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1 text-sm leading-6 text-slate-500">
-                  Choose your details, take a live photo, and save your attendance.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                aria-label="Close"
-              >
-                <X className="size-5" />
-              </Dialog.Close>
-            </div>
-            <form
-              onSubmit={handleSubmit(submitAttendance)}
-              className="mt-6 grid gap-5 sm:grid-cols-2"
-            >
-              <label className="text-sm font-medium text-slate-700">
-                Site
-                <SoftSelect
-                  value={siteId}
-                  onValueChange={(value) => setValue('siteId', value, { shouldValidate: true })}
-                  placeholder="Select your site"
-                  options={siteOptions}
-                  disabled={options.isLoading}
-                />
-                {errors.siteId && (
-                  <span className="mt-1 block text-xs text-rose-600">{errors.siteId.message}</span>
-                )}
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Shift
-                <SoftSelect
-                  value={shiftId}
-                  onValueChange={(value) => setValue('shiftId', value, { shouldValidate: true })}
-                  placeholder="Select your shift"
-                  options={shiftOptions}
-                  disabled={options.isLoading}
-                />
-                {errors.shiftId && (
-                  <span className="mt-1 block text-xs text-rose-600">{errors.shiftId.message}</span>
-                )}
-              </label>
-              <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-                {active ? 'Check-out time' : 'Check-in time'}
-                <input
-                  type="time"
-                  value={occurredTime}
-                  onChange={(event) =>
-                    setValue('occurredTime', event.target.value, { shouldValidate: true })
-                  }
-                  className="mt-1.5 w-full rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-                />
-                {errors.occurredTime && (
-                  <span className="mt-1 block text-xs text-rose-600">
-                    {errors.occurredTime.message}
-                  </span>
-                )}
-              </label>
-              <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/60 p-4 sm:col-span-2">
-                <div className="flex flex-wrap items-center gap-4">
-                  {capturedPreview ? (
-                    <span
-                      style={{ backgroundImage: `url(${capturedPreview})` }}
-                      className="size-20 rounded-xl bg-white bg-cover bg-center shadow-sm"
-                    />
-                  ) : (
-                    <span className="grid size-20 place-items-center rounded-xl bg-white text-sky-500">
-                      <ImagePlus className="size-7" />
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-700">
-                      {active ? 'Check-out photo' : 'Check-in photo'}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Use your device camera to capture a live photo.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openCamera}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-100 px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-200"
-                  >
-                    <Camera className="size-4" />
-                    Take photo
-                  </button>
-                </div>
-                {errors.photo && (
-                  <span className="mt-2 block text-xs text-rose-600">{errors.photo.message}</span>
-                )}
-              </div>
-              <button
-                disabled={busy || options.isLoading}
-                className={`w-full rounded-xl py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2 ${active ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}
-              >
-                {busy ? 'Uploading photo and saving…' : `${actionLabel} now`}
-              </button>
-            </form>
-            {cameraOpen && (
-              <div className="fixed inset-0 z-70 grid place-items-center bg-slate-900/50 p-4">
-                <section className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-bold text-slate-800">Take live photo</h2>
-                    <button
-                      type="button"
-                      onClick={stopCamera}
-                      className="rounded-lg px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="mt-4 aspect-video w-full rounded-2xl bg-slate-900 object-cover"
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                  <button
-                    type="button"
-                    onClick={capturePhoto}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-100 py-3 font-semibold text-sky-700 hover:bg-sky-200"
-                  >
-                    <Camera className="size-4" />
-                    Capture photo
-                  </button>
-                </section>
-              </div>
-            )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <AttendanceDialog
+        actionOpen={actionOpen}
+        onOpen={() => setActionOpen(true)}
+        onClose={closeActionModal}
+        actionLabel={actionLabel}
+        isCheckedIn={Boolean(active)}
+        handleSubmit={handleSubmit}
+        onSubmit={submitAttendance}
+        setValue={setValue}
+        errors={errors}
+        siteId={siteId}
+        shiftId={shiftId}
+        occurredTime={occurredTime}
+        siteOptions={siteOptions}
+        shiftOptions={shiftOptions}
+        optionsLoading={options.isLoading}
+        capturedPreview={capturedPreview}
+        openCamera={openCamera}
+        busy={busy}
+        cameraOpen={cameraOpen}
+        stopCamera={stopCamera}
+        videoRef={videoRef}
+        canvasRef={canvasRef}
+        capturePhoto={capturePhoto}
+      />
     </section>
   );
 }

@@ -39,6 +39,9 @@ export type HrProjectInput = {
   assignments: { userId: string; role: string }[];
 };
 
+export type HrProjectUpdate = { id: string; input: HrProjectInput };
+export type ProjectAssignmentPatch = Partial<HrProjectInput['assignments'][number]>;
+
 export type HrProjectsResponse = {
   projects: HrProject[];
   employees: ProjectEmployee[];

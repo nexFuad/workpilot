@@ -1,33 +1,32 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { HrHeader } from '@/components/hr/HrHeader';
+import { HrAnnouncementEditorDialog } from '@/components/hr/HrAnnouncementEditorDialog';
+import {
+  HrAnnouncementDetailsDialog,
+  priorityStyles,
+  formatDate,
+} from '@/components/hr/HrAnnouncementDetailsDialog';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BellRing,
   CalendarDays,
-  Check,
   Eye,
-  LoaderCircle,
   Megaphone,
   PencilLine,
   Pin,
   Plus,
-  Search,
-  Send,
   Sparkles,
   Trash2,
   UsersRound,
-  X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { SearchInput } from '@/components/shared/SearchInput';
+import { useInfiniteSearchBar } from '@/hooks/use-search-bar';
 import { hrAnnouncementsServer } from '@/server/hr-announcements.server';
-import type {
-  AnnouncementPriority,
-  HrAnnouncement,
-  HrAnnouncementInput,
-} from '@/types/hr-announcement.types';
+import type { HrAnnouncement, HrAnnouncementInput } from '@/types/hr-announcement.types';
 
 const emptyForm: HrAnnouncementInput = {
   title: '',
@@ -37,15 +36,6 @@ const emptyForm: HrAnnouncementInput = {
   isActive: true,
 };
 
-const priorityStyles: Record<AnnouncementPriority, string> = {
-  normal: 'bg-sky-50 text-sky-700 ring-sky-100',
-  important: 'bg-amber-50 text-amber-700 ring-amber-100',
-  urgent: 'bg-rose-50 text-rose-700 ring-rose-100',
-};
-
-const fieldClass =
-  'mt-2 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100';
-
 function announcementInput(item: HrAnnouncement): HrAnnouncementInput {
   return {
     title: item.title,
@@ -54,14 +44,6 @@ function announcementInput(item: HrAnnouncement): HrAnnouncementInput {
     isPinned: item.isPinned,
     isActive: item.isActive,
   };
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value));
 }
 
 function Toggle({
@@ -113,11 +95,9 @@ function AnnouncementSkeleton() {
 
 export default function AnnouncementsPage() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search.trim());
-  const announcements = useInfiniteQuery({
-    queryKey: ['hr', 'announcements', debouncedSearch],
-    queryFn: ({ pageParam }) => hrAnnouncementsServer.list(pageParam, 6, debouncedSearch),
+  const announcements = useInfiniteSearchBar({
+    queryKey: ['hr', 'announcements'],
+    queryFn: (search, pageParam) => hrAnnouncementsServer.list(pageParam, 6, search),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
   });
@@ -229,25 +209,20 @@ export default function AnnouncementsPage() {
 
   return (
     <section className="w-full space-y-6 pb-10">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-            HR workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-800">Announcements</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Publish company updates and control what employees can see.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:self-auto"
-        >
-          <Plus className="size-4" />
-          Create announcement
-        </button>
-      </header>
+      <HrHeader
+        title="Announcements"
+        description="Publish company updates and control what employees can see."
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:self-auto"
+          >
+            <Plus className="size-4" />
+            Create announcement
+          </button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[
@@ -283,16 +258,14 @@ export default function AnnouncementsPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="relative block w-full sm:max-w-md">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search announcement title or content..."
-            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full sm:max-w-md"
+          iconClassName="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+          value={announcements.searchTerm}
+          onChange={(event) => announcements.setSearchTerm(event.target.value)}
+          placeholder="Search announcement title or content..."
+          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+        />
       </div>
 
       {api.announcements.isPending ? (
@@ -430,220 +403,33 @@ export default function AnnouncementsPage() {
         ) : null}
       </div>
 
-      <Dialog.Root open={editorOpen} onOpenChange={setEditorOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-white/60 bg-white p-6 shadow-2xl sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-2xl font-bold text-slate-800">
-                  {editing ? 'Edit announcement' : 'Create announcement'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1.5 text-sm text-slate-500">
-                  {editing
-                    ? 'Update the announcement details and visibility.'
-                    : 'Share an important update with all employees.'}
-                </Dialog.Description>
-              </div>
-              <Dialog.Close className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800">
-                <X className="size-4" />
-              </Dialog.Close>
-            </div>
+      <HrAnnouncementEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        onSubmit={save}
+        isSaving={isSaving}
+      />
+      <HrAnnouncementDetailsDialog
+        detailsTarget={detailsTarget}
+        onClose={() => setDetailsTarget(null)}
+      />
 
-            <form onSubmit={save} className="mt-6 space-y-5">
-              <label className="block text-sm font-bold text-slate-700">
-                Announcement title
-                <input
-                  required
-                  minLength={3}
-                  maxLength={160}
-                  placeholder="e.g. Office holiday notice"
-                  value={form.title}
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                  className={fieldClass}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Announcement message
-                <textarea
-                  required
-                  minLength={5}
-                  maxLength={2000}
-                  rows={6}
-                  placeholder="Write the complete update for employees..."
-                  value={form.content}
-                  onChange={(event) => setForm({ ...form, content: event.target.value })}
-                  className={`${fieldClass} resize-none leading-6`}
-                />
-                <span className="mt-1.5 block text-right text-xs font-medium text-slate-400">
-                  {form.content.length}/2000
-                </span>
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Priority
-                <select
-                  value={form.priority}
-                  onChange={(event) =>
-                    setForm({ ...form, priority: event.target.value as AnnouncementPriority })
-                  }
-                  className={fieldClass}
-                >
-                  <option value="normal">Normal</option>
-                  <option value="important">Important</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                  <span>
-                    <span className="block text-sm font-bold text-slate-700">Active status</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">
-                      Visible to employees
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={form.isActive}
-                    onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-                    className="size-4 accent-emerald-600"
-                  />
-                </label>
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                  <span>
-                    <span className="block text-sm font-bold text-slate-700">Pin announcement</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">Keep it at the top</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={form.isPinned}
-                    onChange={(event) => setForm({ ...form, isPinned: event.target.checked })}
-                    className="size-4 accent-emerald-600"
-                  />
-                </label>
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSaving ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : editing ? (
-                    <Check className="size-4" />
-                  ) : (
-                    <Send className="size-4" />
-                  )}
-                  {editing ? 'Save changes' : 'Publish announcement'}
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root
-        open={Boolean(detailsTarget)}
-        onOpenChange={(open) => !open && setDetailsTarget(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
-                {detailsTarget?.isPinned ? (
-                  <Pin className="size-5 fill-current" />
-                ) : (
-                  <BellRing className="size-6" />
-                )}
-              </span>
-              <Dialog.Close className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800">
-                <X className="size-4" />
-              </Dialog.Close>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ring-1 ${priorityStyles[detailsTarget?.priority ?? 'normal']}`}
-              >
-                {detailsTarget?.priority}
-              </span>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${detailsTarget?.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
-              >
-                {detailsTarget?.isActive ? 'Active' : 'Inactive'}
-              </span>
-              {detailsTarget?.isPinned && (
-                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700">
-                  Pinned
-                </span>
-              )}
-            </div>
-
-            <Dialog.Title className="mt-4 text-2xl font-bold text-slate-800">
-              {detailsTarget?.title}
-            </Dialog.Title>
-            <Dialog.Description asChild>
-              <div>
-                <p className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-400">
-                  <CalendarDays className="size-4" />
-                  Published {detailsTarget ? formatDate(detailsTarget.publishedAt) : ''}
-                </p>
-                <p className="mt-6 whitespace-pre-wrap border-t border-slate-100 pt-6 text-sm leading-7 text-slate-600">
-                  {detailsTarget?.content}
-                </p>
-              </div>
-            </Dialog.Description>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root
+      <DeleteModal
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-11 place-items-center rounded-xl bg-rose-50 text-rose-600">
-              <Trash2 className="size-5" />
-            </span>
-            <Dialog.Title className="mt-4 text-xl font-bold text-slate-800">
-              Delete announcement?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
-              “{deleteTarget?.title}” will be permanently removed and employees will no longer see
-              it.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3">
-              <Dialog.Close className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                Cancel
-              </Dialog.Close>
-              <button
-                type="button"
-                disabled={api.remove.isPending}
-                onClick={() => void remove()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {api.remove.isPending && <LoaderCircle className="size-4 animate-spin" />}
-                Delete
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleteTarget(null)}
+        onDelete={() => void remove()}
+        isDeleting={api.remove.isPending}
+        title="Delete announcement?"
+        description={
+          <>
+            “{deleteTarget?.title}” will be permanently removed and employees will no longer see it.
+          </>
+        }
+        confirmLabel="Delete"
+      />
     </section>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, Clock3, ListTodo, Search } from 'lucide-react';
+import { CheckCircle2, Circle, Clock3, ListTodo } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { tasksServer } from '@/server/tasks.server';
 import type { TaskStatus } from '@/types/task.types';
@@ -98,16 +99,14 @@ export default function TasksPage() {
         </article>
       </div>
       <div>
-        <label className="relative block w-full sm:max-w-md">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
-          <input
-            type="search"
-            value={tasks.searchTerm}
-            onChange={(event) => tasks.setSearchTerm(event.target.value)}
-            placeholder="Search task title or description..."
-            className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full sm:max-w-md"
+          iconClassName="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-sky-600"
+          value={tasks.searchTerm}
+          onChange={(event) => tasks.setSearchTerm(event.target.value)}
+          placeholder="Search task title or description..."
+          className="h-11 w-full rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+        />
         {tasks.isFetching && !tasks.isLoading ? (
           <p className="mt-2 text-xs font-medium text-slate-500">Searching tasks…</p>
         ) : null}

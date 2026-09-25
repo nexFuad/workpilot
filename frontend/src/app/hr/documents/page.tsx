@@ -1,11 +1,14 @@
 'use client';
-import * as Dialog from '@radix-ui/react-dialog';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { HrHeader } from '@/components/hr/HrHeader';
+import { HrDocumentReviewDialog } from '@/components/hr/HrDocumentReviewDialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, FileText, LoaderCircle, MoreHorizontal, Search, Trash2, X } from 'lucide-react';
+import { Check, FileText, MoreHorizontal, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useSearchBar } from '@/hooks/use-search-bar';
 import { hrDocumentsServer, type HrDocument } from '@/server/hr-documents.server';
 const colors: Record<string, string> = {
@@ -79,27 +82,19 @@ export default function DocumentsPage() {
   };
   return (
     <section className="w-full space-y-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-600">
-          HR workspace
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-800">Documents</h1>
-        <p className="mt-2 text-sm text-slate-600">Review documents uploaded by all employees.</p>
-      </div>
+      <HrHeader title="Documents" description="Review documents uploaded by all employees." />
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <label className="relative block w-full lg:max-w-md">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={api.documents.searchTerm}
-            onChange={(event) => {
-              api.documents.setSearchTerm(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search employee or document..."
-            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full lg:max-w-md"
+          iconClassName="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+          value={api.documents.searchTerm}
+          onChange={(event) => {
+            api.documents.setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Search employee or document..."
+          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+        />
         <div className="flex flex-wrap gap-2">
           {['all', 'pending', 'approved', 'rejected'].map((x) => (
             <button
@@ -226,122 +221,27 @@ export default function DocumentsPage() {
         </div>
       </section>
 
-      <Dialog.Root
-        open={Boolean(reviewTarget)}
-        onOpenChange={(open) => {
-          if (!open && !api.review.isPending) setReviewTarget(null);
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/70 bg-white p-6 shadow-2xl outline-none sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-xl font-bold text-slate-900">
-                  {reviewTarget?.status === 'approved' ? 'Approve document' : 'Reject document'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1.5 text-sm leading-6 text-slate-500">
-                  Add a reason for reviewing {reviewTarget?.document.name}.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  disabled={api.review.isPending}
-                  aria-label="Close review dialog"
-                  className="grid size-9 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <X className="size-5" />
-                </button>
-              </Dialog.Close>
-            </div>
-            <form onSubmit={review} className="mt-6 space-y-5">
-              <label className="block text-sm font-bold text-slate-700">
-                Review reason
-                <textarea
-                  value={reviewerNote}
-                  onChange={(event) => setReviewerNote(event.target.value)}
-                  rows={5}
-                  required
-                  placeholder="Write the reason for your decision"
-                  className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-normal text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-                />
-              </label>
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    disabled={api.review.isPending}
-                    className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={api.review.isPending}
-                  className={`inline-flex h-10 items-center gap-2 rounded-xl px-5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${reviewTarget?.status === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
-                >
-                  {api.review.isPending ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : reviewTarget?.status === 'approved' ? (
-                    <Check className="size-4" />
-                  ) : (
-                    <X className="size-4" />
-                  )}
-                  Confirm {reviewTarget?.status === 'approved' ? 'approval' : 'rejection'}
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <HrDocumentReviewDialog
+        reviewTarget={reviewTarget}
+        reviewerNote={reviewerNote}
+        onReviewerNoteChange={setReviewerNote}
+        onClose={() => setReviewTarget(null)}
+        onSubmit={review}
+        isPending={api.review.isPending}
+      />
 
-      <Dialog.Root
+      <DeleteModal
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open && !api.remove.isPending) setDeleteTarget(null);
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/70 bg-white p-6 shadow-2xl outline-none sm:p-7">
-            <span className="grid size-12 place-items-center rounded-2xl bg-rose-50 text-rose-600">
-              <Trash2 className="size-5" />
-            </span>
-            <Dialog.Title className="mt-5 text-xl font-bold text-slate-900">
-              Delete document?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
-              {deleteTarget?.name} will be permanently removed from the employee document records.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  disabled={api.remove.isPending}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-              </Dialog.Close>
-              <button
-                type="button"
-                onClick={remove}
-                disabled={api.remove.isPending}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-5 text-sm font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {api.remove.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-                Delete document
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleteTarget(null)}
+        onDelete={() => void remove()}
+        isDeleting={api.remove.isPending}
+        title="Delete document?"
+        description={
+          <>{deleteTarget?.name} will be permanently removed from the employee document records.</>
+        }
+        confirmLabel="Delete document"
+        preventCloseWhileDeleting
+      />
     </section>
   );
 }

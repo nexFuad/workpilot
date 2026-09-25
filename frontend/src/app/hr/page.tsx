@@ -211,6 +211,7 @@ export default function HrPage() {
 
   return (
     <section className="w-full space-y-6">
+      {/* dashboard header */}
       <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-emerald-700 via-emerald-600 to-teal-500 p-6 text-white shadow-lg shadow-emerald-900/10 sm:p-8">
         <div className="absolute -right-12 -top-16 size-52 rounded-full bg-white/10" />
         <div className="absolute -bottom-24 right-28 size-56 rounded-full bg-teal-300/10" />

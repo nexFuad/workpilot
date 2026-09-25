@@ -1,31 +1,42 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { HrHeader } from '@/components/hr/HrHeader';
+import {
+  HrProjectDetailsDialog,
+  formatDate,
+  statusLabel,
+  statusStyle,
+} from '@/components/hr/HrProjectDetailsDialog';
+import { HrProjectEditorDialog } from '@/components/hr/HrProjectEditorDialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarDays,
   CheckCircle2,
   Clock3,
   Eye,
   FolderKanban,
-  LoaderCircle,
   MoreHorizontal,
   PencilLine,
   Plus,
-  Search,
   Trash2,
-  UserPlus,
   UsersRound,
-  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Pagination } from '@/components/shared/Pagination';
 import { SoftSelect } from '@/components/ui/SoftSelect';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { SearchInput } from '@/components/shared/SearchInput';
+import { useSearchBar } from '@/hooks/use-search-bar';
 import { hrProjectsServer } from '@/server/hr-projects.server';
-import type { HrProject, HrProjectInput, ProjectStatus } from '@/types/hr-project.types';
+import type {
+  HrProject,
+  HrProjectInput,
+  HrProjectUpdate,
+  ProjectAssignmentPatch,
+  ProjectStatus,
+} from '@/types/hr-project.types';
 
 const emptyForm: HrProjectInput = {
   name: '',
@@ -36,23 +47,6 @@ const emptyForm: HrProjectInput = {
   endDate: '',
   assignments: [],
 };
-
-const statusLabel: Record<ProjectStatus, string> = {
-  planned: 'Planned',
-  active: 'Active',
-  on_hold: 'On hold',
-  completed: 'Completed',
-};
-
-const statusStyle: Record<ProjectStatus, string> = {
-  planned: 'bg-sky-100 text-sky-700',
-  active: 'bg-emerald-100 text-emerald-700',
-  on_hold: 'bg-amber-100 text-amber-700',
-  completed: 'bg-violet-100 text-violet-700',
-};
-
-const fieldClass =
-  'mt-2 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100';
 
 function toInput(project: HrProject): HrProjectInput {
   return {
@@ -69,16 +63,6 @@ function toInput(project: HrProject): HrProjectInput {
   };
 }
 
-function formatDate(value: string | null) {
-  return value
-    ? new Intl.DateTimeFormat('en-US', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }).format(new Date(value))
-    : 'Not set';
-}
-
 function truncateWords(value: string | null, limit = 10) {
   if (!value?.trim()) return 'No description';
   const words = value.trim().split(/\s+/);
@@ -88,18 +72,15 @@ function truncateWords(value: string | null, limit = 10) {
 export default function HrProjectsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | ProjectStatus>('all');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<HrProject | null>(null);
   const [viewTarget, setViewTarget] = useState<HrProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<HrProject | null>(null);
   const [form, setForm] = useState<HrProjectInput>(emptyForm);
-  const debouncedSearch = useDebouncedValue(search.trim());
-  const params = { search: debouncedSearch, status, page, limit: 10 };
-  const projectsQuery = useQuery({
-    queryKey: ['hr', 'projects', params],
-    queryFn: () => hrProjectsServer.list(params),
+  const projectsQuery = useSearchBar({
+    queryKey: ['hr', 'projects', { status, page, limit: 10 }],
+    queryFn: (search) => hrProjectsServer.list({ search, status, page, limit: 10 }),
   });
   const refreshProjects = async () => {
     await Promise.all([
@@ -109,8 +90,7 @@ export default function HrProjectsPage() {
   };
   const create = useMutation({ mutationFn: hrProjectsServer.create, onSuccess: refreshProjects });
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: HrProjectInput }) =>
-      hrProjectsServer.update(id, input),
+    mutationFn: ({ id, input }: HrProjectUpdate) => hrProjectsServer.update(id, input),
     onSuccess: refreshProjects,
   });
   const removeProject = useMutation({
@@ -193,7 +173,7 @@ export default function HrProjectsPage() {
     }
   };
 
-  const updateAssignment = (index: number, patch: { userId?: string; role?: string }) => {
+  const updateAssignment = (index: number, patch: ProjectAssignmentPatch) => {
     setForm((current) => ({
       ...current,
       assignments: current.assignments.map((assignment, assignmentIndex) =>
@@ -223,26 +203,21 @@ export default function HrProjectsPage() {
   const saving = api.create.isPending || api.update.isPending;
   return (
     <section className="w-full space-y-6 pb-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-            HR workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-800">Assign projects</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Build project teams and manage timelines, roles and progress.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          disabled={!employees.length && !api.projects.isLoading}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
-        >
-          <Plus className="size-4" />
-          Assign project
-        </button>
-      </header>
+      <HrHeader
+        title="Assign projects"
+        description="Build project teams and manage timelines, roles and progress."
+        action={
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={!employees.length && !api.projects.isLoading}
+            className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+          >
+            <Plus className="size-4" />
+            Assign project
+          </button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -279,18 +254,17 @@ export default function HrProjectsPage() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <label className="relative block w-full lg:max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search project or employee..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:bg-white"
-          />
-        </label>
+        <SearchInput
+          wrapperClassName="relative block w-full lg:max-w-sm"
+          iconClassName="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+          value={projectsQuery.searchTerm}
+          onChange={(event) => {
+            projectsQuery.setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Search project or employee..."
+          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:bg-white"
+        />
         <div className="flex flex-wrap gap-2">
           {(['all', 'planned', 'active', 'on_hold', 'completed'] as const).map((item) => (
             <button
@@ -459,382 +433,41 @@ export default function HrProjectsPage() {
         </div>
       </section>
 
-      <Dialog.Root open={Boolean(viewTarget)} onOpenChange={(open) => !open && setViewTarget(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
-            {viewTarget && (
-              <>
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
-                  <div className="flex min-w-0 items-start gap-4">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-                      <FolderKanban className="size-6" />
-                    </span>
-                    <div className="min-w-0">
-                      <Dialog.Title className="text-2xl font-bold text-slate-800">
-                        {viewTarget.name}
-                      </Dialog.Title>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusStyle[viewTarget.status]}`}
-                        >
-                          {statusLabel[viewTarget.status]}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                          {viewTarget.assignments.length} team member
-                          {viewTarget.assignments.length === 1 ? '' : 's'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <Dialog.Close className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200">
-                    <X className="size-4" />
-                  </Dialog.Close>
-                </div>
+      <HrProjectDetailsDialog
+        viewTarget={viewTarget}
+        onClose={() => setViewTarget(null)}
+        onEdit={(project) => {
+          openEdit(project);
+          setViewTarget(null);
+        }}
+      />
+      <HrProjectEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        employees={employees}
+        onSubmit={save}
+        onAddAssignment={addAssignment}
+        onUpdateAssignment={updateAssignment}
+        onRemoveAssignment={removeAssignment}
+        isSaving={saving}
+      />
 
-                <div className="mt-6">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
-                    Project description
-                  </h3>
-                  <Dialog.Description className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                    {viewTarget.description || 'No project description was provided.'}
-                  </Dialog.Description>
-                </div>
-
-                <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                    <dt className="text-xs text-slate-400">Project start</dt>
-                    <dd className="mt-1 flex items-center gap-2 text-sm font-bold text-slate-700">
-                      <CalendarDays className="size-4 text-emerald-600" />
-                      {formatDate(viewTarget.startDate)}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                    <dt className="text-xs text-slate-400">Deadline</dt>
-                    <dd className="mt-1 flex items-center gap-2 text-sm font-bold text-slate-700">
-                      <CalendarDays className="size-4 text-amber-600" />
-                      {formatDate(viewTarget.endDate)}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                    <dt className="text-xs text-slate-400">Created</dt>
-                    <dd className="mt-1 text-sm font-bold text-slate-700">
-                      {formatDate(viewTarget.createdAt)}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                    <dt className="text-xs text-slate-400">Last updated</dt>
-                    <dd className="mt-1 text-sm font-bold text-slate-700">
-                      {formatDate(viewTarget.updatedAt)}
-                    </dd>
-                  </div>
-                </dl>
-
-                <section className="mt-6 rounded-2xl border border-slate-200 p-4 sm:p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h3 className="font-bold text-slate-800">Project progress</h3>
-                      <p className="mt-1 text-xs text-slate-500">Current completion percentage</p>
-                    </div>
-                    <span className="text-xl font-bold text-emerald-700">
-                      {viewTarget.progress}%
-                    </span>
-                  </div>
-                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{ width: `${viewTarget.progress}%` }}
-                    />
-                  </div>
-                </section>
-
-                <section className="mt-6">
-                  <div>
-                    <h3 className="font-bold text-slate-800">Assigned project team</h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Employees and their responsibilities in this project.
-                    </p>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {viewTarget.assignments.map((assignment) => (
-                      <article
-                        key={assignment.id}
-                        className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5"
-                      >
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-sm font-bold text-emerald-700 shadow-sm">
-                          {(assignment.user.fullName || assignment.user.employeeId)
-                            .split(' ')
-                            .map((part) => part[0])
-                            .join('')
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-slate-800">
-                            {assignment.user.fullName || assignment.user.employeeId}
-                          </p>
-                          <p className="mt-0.5 truncate text-xs text-slate-500">
-                            {assignment.user.employeeId} · {assignment.role}
-                          </p>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-
-                <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
-                  <Dialog.Close className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                    Close
-                  </Dialog.Close>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      openEdit(viewTarget);
-                      setViewTarget(null);
-                    }}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700"
-                  >
-                    <PencilLine className="size-4" /> Edit project
-                  </button>
-                </div>
-              </>
-            )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root open={editorOpen} onOpenChange={setEditorOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-2xl font-bold text-slate-800">
-                  {editing ? 'Edit assigned project' : 'Assign a new project'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1.5 text-sm text-slate-500">
-                  Set up the project and add one or more employees to its team.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200">
-                <X className="size-4" />
-              </Dialog.Close>
-            </div>
-
-            <form onSubmit={save} className="mt-6 grid gap-5 sm:grid-cols-2">
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Project name
-                <input
-                  required
-                  minLength={3}
-                  maxLength={160}
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  placeholder="e.g. Employee mobile application"
-                  className={fieldClass}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700 sm:col-span-2">
-                Project description
-                <textarea
-                  rows={4}
-                  maxLength={2000}
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  placeholder="Describe the goal, expected deliverables and project scope..."
-                  className={`${fieldClass} resize-none leading-6`}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Project status
-                <SoftSelect
-                  value={form.status}
-                  onValueChange={(value) => setForm({ ...form, status: value as ProjectStatus })}
-                  placeholder="Select project status"
-                  tone="emerald"
-                  options={[
-                    { value: 'planned', label: 'Planned' },
-                    { value: 'active', label: 'Active' },
-                    { value: 'on_hold', label: 'On hold' },
-                    { value: 'completed', label: 'Completed' },
-                  ]}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Progress percentage
-                <div className="mt-2 flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={form.progress}
-                    onChange={(event) => setForm({ ...form, progress: Number(event.target.value) })}
-                    className="flex-1 accent-emerald-600"
-                  />
-                  <span className="w-10 text-right text-sm font-bold text-emerald-700">
-                    {form.progress}%
-                  </span>
-                </div>
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                Start date
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(event) => setForm({ ...form, startDate: event.target.value })}
-                  className={fieldClass}
-                />
-              </label>
-
-              <label className="block text-sm font-bold text-slate-700">
-                End date
-                <input
-                  type="date"
-                  min={form.startDate || undefined}
-                  value={form.endDate}
-                  onChange={(event) => setForm({ ...form, endDate: event.target.value })}
-                  className={fieldClass}
-                />
-              </label>
-
-              <div className="sm:col-span-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-700">Project team</h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Assign employees and define their responsibility.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addAssignment}
-                    disabled={form.assignments.length >= employees.length}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                  >
-                    <UserPlus className="size-4" /> Add member
-                  </button>
-                </div>
-
-                <div className="mt-3 space-y-3">
-                  {form.assignments.map((assignment, index) => {
-                    const otherSelected = new Set(
-                      form.assignments
-                        .filter((_, assignmentIndex) => assignmentIndex !== index)
-                        .map((item) => item.userId),
-                    );
-                    return (
-                      <div
-                        key={`${index}-${assignment.userId}`}
-                        className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-[1.25fr_1fr_auto] sm:items-end"
-                      >
-                        <label className="block text-xs font-bold text-slate-600">
-                          Employee
-                          <SoftSelect
-                            value={assignment.userId || undefined}
-                            onValueChange={(value) => updateAssignment(index, { userId: value })}
-                            placeholder="Select employee"
-                            tone="emerald"
-                            options={employees
-                              .filter((employee) => !otherSelected.has(employee.id))
-                              .map((employee) => ({
-                                value: employee.id,
-                                label: `${employee.fullName || employee.employeeId} · ${employee.employeeId}`,
-                              }))}
-                          />
-                        </label>
-                        <label className="block text-xs font-bold text-slate-600">
-                          Project role
-                          <input
-                            required
-                            minLength={2}
-                            maxLength={80}
-                            value={assignment.role}
-                            onChange={(event) =>
-                              updateAssignment(index, { role: event.target.value })
-                            }
-                            placeholder="e.g. Designer"
-                            className={fieldClass}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          aria-label="Remove team member"
-                          onClick={() => removeAssignment(index)}
-                          className="grid size-11 place-items-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:col-span-2 sm:flex-row sm:justify-end">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {saving ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : (
-                    <FolderKanban className="size-4" />
-                  )}
-                  {editing ? 'Save changes' : 'Assign project'}
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root
+      <DeleteModal
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-11 place-items-center rounded-xl bg-rose-50 text-rose-600">
-              <Trash2 className="size-5" />
-            </span>
-            <Dialog.Title className="mt-4 text-xl font-bold text-slate-800">
-              Delete assigned project?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
-              “{deleteTarget?.name}” and all of its employee assignments will be permanently
-              removed.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3">
-              <Dialog.Close className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                Cancel
-              </Dialog.Close>
-              <button
-                type="button"
-                disabled={api.remove.isPending}
-                onClick={() => void remove()}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {api.remove.isPending && <LoaderCircle className="size-4 animate-spin" />}
-                Delete project
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleteTarget(null)}
+        onDelete={() => void remove()}
+        isDeleting={api.remove.isPending}
+        title="Delete assigned project?"
+        description={
+          <>
+            “{deleteTarget?.name}” and all of its employee assignments will be permanently removed.
+          </>
+        }
+        confirmLabel="Delete project"
+      />
     </section>
   );
 }

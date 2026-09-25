@@ -4,6 +4,7 @@ import { CalendarDays, Timer, UsersRound } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { hrAttendanceServer } from '@/server/hr-attendance.server';
+import { HrHeader } from '@/components/hr/HrHeader';
 import { Pagination } from '@/components/shared/Pagination';
 const today = new Date().toISOString().slice(0, 10);
 const time = (value: string | null) =>
@@ -31,15 +32,10 @@ export default function AttendancePage() {
   const rows = data?.attendance ?? [];
   return (
     <section className="w-full space-y-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-          HR workspace
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-800">Attendance</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Review employee check-in, check-out, absence and overtime.
-        </p>
-      </div>
+      <HrHeader
+        title="Attendance"
+        description="Review employee check-in, check-out, absence and overtime."
+      />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Employees', value: data?.summary.total ?? 0, icon: UsersRound },

@@ -1,30 +1,20 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from 'zod';
 import { EmployeeHeader } from '@/components/employee/EmployeeHeader';
+import { LeaveRequestDialog } from '@/components/employee/LeaveRequestDialog';
+import { DeleteModal } from '@/components/shared/DeleteModal';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { useAuth } from '@/hooks/use-auth';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useSearchBar } from '@/hooks/use-search-bar';
 import { leaveServer } from '@/server/leave.server';
+import { leaveSchema } from '@/types/leave.types';
 import type { LeaveRequest, LeaveRequestInput } from '@/types/leave.types';
-
-const schema = z
-  .object({
-    leaveType: z.string().min(2, 'Choose a leave type'),
-    reason: z.string().min(5, 'Write a short reason'),
-    startDate: z.string().min(1, 'Choose a start date'),
-    endDate: z.string().min(1, 'Choose an end date'),
-  })
-  .refine((data) => !data.startDate || !data.endDate || data.endDate >= data.startDate, {
-    path: ['endDate'],
-    message: 'End date must be on or after the start date.',
-  });
 
 const emptyForm: LeaveRequestInput = {
   leaveType: '',
@@ -41,12 +31,10 @@ export default function LeavePage() {
   const [editing, setEditing] = useState<LeaveRequest | null>(null);
   const [deleting, setDeleting] = useState<LeaveRequest | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
-  const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
-  const debouncedSearch = useDebouncedValue(searchTerm.trim());
-  const requests = useQuery({
-    queryKey: ['leave', 'requests', debouncedSearch],
-    queryFn: () => leaveServer.list(debouncedSearch),
+  const requests = useSearchBar({
+    queryKey: ['leave', 'requests'],
+    queryFn: leaveServer.list,
   });
   const refreshRequests = () => queryClient.invalidateQueries({ queryKey: ['leave', 'requests'] });
   const create = useMutation({ mutationFn: leaveServer.create, onSuccess: refreshRequests });
@@ -61,7 +49,7 @@ export default function LeavePage() {
     reset,
     register,
     formState: { errors },
-  } = useForm<LeaveRequestInput>({ resolver: zodResolver(schema), defaultValues: emptyForm });
+  } = useForm<LeaveRequestInput>({ resolver: zodResolver(leaveSchema), defaultValues: emptyForm });
   const openCreate = () => {
     setEditing(null);
     reset(emptyForm);
@@ -119,18 +107,17 @@ export default function LeavePage() {
           </button>
         }
       />
-      <div className="relative mt-7 max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sky-600" />
-        <input
-          value={searchTerm}
-          onChange={(event) => {
-            setSearchTerm(event.target.value);
-            setVisibleCount(6);
-          }}
-          placeholder="Search any leave information"
-          className="w-full rounded-xl border border-sky-100 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-        />
-      </div>
+      <SearchInput
+        wrapperClassName="relative mt-7 block max-w-md"
+        iconClassName="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sky-600"
+        value={requests.searchTerm}
+        onChange={(event) => {
+          requests.setSearchTerm(event.target.value);
+          setVisibleCount(6);
+        }}
+        placeholder="Search any leave information"
+        className="w-full rounded-xl border border-sky-100 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
+      />
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         {requests.isLoading &&
           Array.from({ length: 6 }, (_, index) => (
@@ -222,124 +209,26 @@ export default function LeavePage() {
         </button>
       )}
 
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-[1px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-sky-100 bg-white p-5 shadow-2xl sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-xl font-bold text-slate-800">
-                  {editing ? 'Edit leave request' : 'Leave request'}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1 text-sm text-slate-500">
-                  Submit the required leave information for review.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-                <X className="size-5" />
-              </Dialog.Close>
-            </div>
-            <form onSubmit={handleSubmit(submit)} className="mt-6 grid gap-5 sm:grid-cols-2">
-              <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-                Employee ID
-                <input
-                  value={user?.employeeId ?? 'Loading…'}
-                  readOnly
-                  className="mt-1.5 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600"
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Leave type
-                <select
-                  {...register('leaveType')}
-                  className="mt-1.5 w-full rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-                >
-                  <option value="">Select leave type</option>
-                  <option>Annual leave</option>
-                  <option>Sick leave</option>
-                  <option>Casual leave</option>
-                  <option>Emergency leave</option>
-                </select>
-                {errors.leaveType && (
-                  <span className="mt-1 block text-xs text-rose-600">
-                    {errors.leaveType.message}
-                  </span>
-                )}
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Leave start date
-                <input
-                  {...register('startDate')}
-                  type="date"
-                  className="mt-1.5 w-full rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-                />
-                {errors.startDate && (
-                  <span className="mt-1 block text-xs text-rose-600">
-                    {errors.startDate.message}
-                  </span>
-                )}
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Leave end date
-                <input
-                  {...register('endDate')}
-                  type="date"
-                  className="mt-1.5 w-full rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-                />
-                {errors.endDate && (
-                  <span className="mt-1 block text-xs text-rose-600">{errors.endDate.message}</span>
-                )}
-              </label>
-              <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-                Reason
-                <textarea
-                  {...register('reason')}
-                  rows={4}
-                  placeholder="Tell us why you need leave"
-                  className="mt-1.5 w-full resize-none rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-3 text-sm text-slate-700 outline-none focus:ring-4 focus:ring-sky-100"
-                />
-                {errors.reason && (
-                  <span className="mt-1 block text-xs text-rose-600">{errors.reason.message}</span>
-                )}
-              </label>
-              <button
-                disabled={busy}
-                className="w-full rounded-xl bg-sky-100 py-3 font-semibold text-sky-700 disabled:opacity-60 sm:col-span-2"
-              >
-                {busy ? 'Saving request…' : editing ? 'Save changes' : 'Submit leave request'}
-              </button>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-      <Dialog.Root
+      <LeaveRequestDialog
+        open={open}
+        onOpenChange={setOpen}
+        isEditing={Boolean(editing)}
+        employeeId={user?.employeeId}
+        handleSubmit={handleSubmit}
+        onSubmit={submit}
+        register={register}
+        errors={errors}
+        busy={busy}
+      />
+      <DeleteModal
         open={Boolean(deleting)}
-        onOpenChange={(nextOpen) => !nextOpen && setDeleting(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-60 bg-slate-900/30 backdrop-blur-[1px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-60 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-rose-100 bg-white p-6 shadow-2xl">
-            <Dialog.Title className="text-lg font-bold text-slate-800">
-              Delete leave request?
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-slate-600">
-              This pending leave request will be permanently removed.
-            </Dialog.Description>
-            <div className="mt-6 flex justify-end gap-3">
-              <Dialog.Close className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-                Cancel
-              </Dialog.Close>
-              <button
-                onClick={deleteRequest}
-                disabled={remove.isPending}
-                className="rounded-lg bg-rose-100 px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
-              >
-                {remove.isPending ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onClose={() => setDeleting(null)}
+        onDelete={() => void deleteRequest()}
+        isDeleting={remove.isPending}
+        title="Delete leave request?"
+        description="This pending leave request will be permanently removed."
+        confirmLabel="Delete"
+      />
     </section>
   );
 }

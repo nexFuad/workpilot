@@ -17,8 +17,10 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { useCloudinaryUpload } from '@/hooks/use-cloudinary-upload';
+
 const field =
   'mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100';
+
 export function ProfileSettings({ title = 'Profile settings' }: { title?: string }) {
   const { user, updateProfile, updatePassword } = useAuth();
   const { uploadFile, isUploading } = useCloudinaryUpload();
